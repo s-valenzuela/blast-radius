@@ -1,0 +1,9 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: cert-graph
+
+certgraph:
+  source: classpath:certs.yml

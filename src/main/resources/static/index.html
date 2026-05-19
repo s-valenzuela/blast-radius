@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Cert Graph</title>
+  <script src="https://unpkg.com/vis-network@9.1.9/standalone/umd/vis-network.min.js"></script>
+  <style>
+    html, body { margin: 0; height: 100%; font-family: -apple-system, Segoe UI, sans-serif; background: #0f172a; color: #e2e8f0; }
+    #app { display: grid; grid-template-columns: 320px 1fr; height: 100vh; }
+    aside { background: #111827; border-right: 1px solid #1f2937; padding: 16px; overflow-y: auto; }
+    aside h1 { font-size: 16px; margin: 0 0 12px; }
+    aside h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: #94a3b8; margin: 18px 0 6px; }
+    main { position: relative; }
+    #network { width: 100%; height: 100%; background: #0f172a; }
+    .cert { display: block; width: 100%; text-align: left; padding: 8px 10px; margin: 4px 0; border-radius: 6px; border: 1px solid #1f2937; background: #0b1220; color: #e2e8f0; cursor: pointer; }
+    .cert:hover { border-color: #38bdf8; }
+    .cert.active { border-color: #f59e0b; background: #1c1917; }
+    .cert .name { font-weight: 600; font-size: 13px; }
+    .cert .meta { font-size: 11px; color: #94a3b8; margin-top: 2px; }
+    .badge { display: inline-block; font-size: 10px; padding: 2px 6px; border-radius: 10px; margin-left: 6px; }
+    .badge.ok { background: #052e16; color: #86efac; }
+    .badge.warn { background: #422006; color: #fbbf24; }
+    .badge.crit { background: #450a0a; color: #fca5a5; }
+    #impact { font-size: 12px; line-height: 1.5; }
+    #impact ul { margin: 4px 0; padding-left: 18px; }
+    #legend { position: absolute; bottom: 12px; left: 12px; background: rgba(17,24,39,.85); border: 1px solid #1f2937; border-radius: 6px; padding: 8px 10px; font-size: 11px; }
+    #legend span.dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
+    #reset { float: right; font-size: 11px; background: #1f2937; color: #cbd5e1; border: 0; padding: 4px 8px; border-radius: 4px; cursor: pointer; }
+  </style>
+</head>
+<body>
+<div id="app">
+  <aside>
+    <h1>Cert Graph <button id="reset">clear</button></h1>
+    <div style="font-size:11px;color:#94a3b8;">Click a certificate to highlight every service that breaks when it expires.</div>
+
+    <h2>Certificates</h2>
+    <div id="certs"></div>
+
+    <h2>Impact</h2>
+    <div id="impact">Select a certificate.</div>
+  </aside>
+  <main>
+    <div id="network"></div>
+    <div id="legend">
+      <div><span class="dot" style="background:#f59e0b;"></span>Certificate</div>
+      <div><span class="dot" style="background:#38bdf8;"></span>Service</div>
+      <div><span class="dot" style="background:#ef4444;"></span>Directly affected</div>
+      <div><span class="dot" style="background:#fb923c;"></span>Transitively affected</div>
+    </div>
+  </main>
+</div>
+
+<script>
+const COLORS = {
+  cert:   { background: '#f59e0b', border: '#b45309', font: '#0f172a' },
+  service:{ background: '#1e293b', border: '#38bdf8', font: '#e2e8f0' },
+  direct: { background: '#ef4444', border: '#7f1d1d', font: '#fff' },
+  trans:  { background: '#fb923c', border: '#7c2d12', font: '#0f172a' },
+  dim:    { background: '#1f2937', border: '#334155', font: '#475569' },
+};
+
+let network, nodesDS, edgesDS;
+let allNodes = [];
+
+async function load() {
+  const [graph, certs] = await Promise.all([
+    fetch('/api/graph').then(r => r.json()),
+    fetch('/api/certs').then(r => r.json()),
+  ]);
+  renderCerts(certs);
+  renderGraph(graph);
+}
+
+function renderCerts(certs) {
+  const root = document.getElementById('certs');
+  root.innerHTML = '';
+  certs.sort((a,b) => (a.daysToExpiry||0) - (b.daysToExpiry||0));
+  for (const c of certs) {
+    const btn = document.createElement('button');
+    btn.className = 'cert';
+    btn.dataset.id = c.id;
+    const d = c.daysToExpiry;
+    const cls = d <= 30 ? 'crit' : d <= 90 ? 'warn' : 'ok';
+    const label = d == null ? '—' : (d < 0 ? `expired ${-d}d ago` : `${d}d left`);
+    btn.innerHTML = `<div class="name">${c.name || c.id}<span class="badge ${cls}">${label}</span></div>
+                     <div class="meta">${c.issuer || ''} · expires ${c.expiresOn || '—'}</div>`;
+    btn.onclick = () => selectCert(c.id, btn);
+    root.appendChild(btn);
+  }
+}
+
+function renderGraph(graph) {
+  allNodes = graph.nodes.map(n => ({
+    id: n.id,
+    label: n.label,
+    group: n.group,
+    title: n.title,
+    shape: n.group === 'cert' ? 'diamond' : 'dot',
+    size: n.group === 'cert' ? 22 : 18,
+    color: n.group === 'cert' ? COLORS.cert : COLORS.service,
+  }));
+  const edges = graph.edges.map((e, i) => ({
+    id: 'e' + i,
+    from: e.from,
+    to: e.to,
+    arrows: 'to',
+    dashes: e.type === 'uses',
+    color: { color: e.type === 'uses' ? '#b45309' : '#475569' },
+    width: 1,
+  }));
+  nodesDS = new vis.DataSet(allNodes);
+  edgesDS = new vis.DataSet(edges);
+  network = new vis.Network(document.getElementById('network'), { nodes: nodesDS, edges: edgesDS }, {
+    physics: { solver: 'forceAtlas2Based', stabilization: { iterations: 200 } },
+    interaction: { hover: true, tooltipDelay: 150 },
+    nodes: { font: { color: '#e2e8f0', size: 12 } },
+    edges: { smooth: { type: 'continuous' } },
+  });
+  network.on('click', params => {
+    if (params.nodes.length === 1) {
+      const id = params.nodes[0];
+      if (id.startsWith('cert:')) {
+        const certId = id.slice(5);
+        const btn = document.querySelector(`button.cert[data-id="${certId}"]`);
+        selectCert(certId, btn);
+      }
+    }
+  });
+}
+
+async function selectCert(certId, btn) {
+  document.querySelectorAll('.cert.active').forEach(el => el.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+
+  const impact = await fetch(`/api/impact/${encodeURIComponent(certId)}`).then(r => r.json());
+  const directSet = new Set(impact.direct.map(id => 'svc:' + id));
+  const transSet  = new Set(impact.transitive.map(id => 'svc:' + id));
+  const certNode  = 'cert:' + certId;
+
+  const updates = allNodes.map(n => {
+    let color = COLORS.dim;
+    if (n.id === certNode)        color = COLORS.cert;
+    else if (directSet.has(n.id)) color = COLORS.direct;
+    else if (transSet.has(n.id))  color = COLORS.trans;
+    return { id: n.id, color };
+  });
+  nodesDS.update(updates);
+
+  const list = (ids) => ids.length
+    ? '<ul>' + ids.map(i => `<li>${i}</li>`).join('') + '</ul>'
+    : '<em style="color:#64748b">none</em>';
+  document.getElementById('impact').innerHTML = `
+    <div><b>${certId}</b> &middot; ${impact.totalServices} service(s) affected</div>
+    <div style="margin-top:8px;color:#fca5a5;font-weight:600;">Directly affected</div>
+    ${list(impact.direct)}
+    <div style="margin-top:6px;color:#fdba74;font-weight:600;">Transitively affected</div>
+    ${list(impact.transitive)}
+  `;
+}
+
+document.getElementById('reset').onclick = () => {
+  document.querySelectorAll('.cert.active').forEach(el => el.classList.remove('active'));
+  document.getElementById('impact').innerHTML = 'Select a certificate.';
+  nodesDS.update(allNodes.map(n => ({ id: n.id, color: n.group === 'cert' ? COLORS.cert : COLORS.service })));
+};
+
+load();
+</script>
+</body>
+</html>
