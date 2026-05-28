@@ -1,9 +1,8 @@
-package com.example.certgraph.service;
+package se.valenzuela.blastradius.service;
 
-import com.example.certgraph.model.CertGraph;
+import se.valenzuela.blastradius.model.ServiceGraph;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
@@ -17,10 +16,10 @@ public class GraphLoader {
 
     private final ResourceLoader resourceLoader;
 
-    @Value("${certgraph.source:classpath:certs.yml}")
+    @Value("${blastradius.source:classpath:services.yml}")
     private String source;
 
-    private volatile CertGraph graph = new CertGraph();
+    private volatile ServiceGraph graph = new ServiceGraph();
 
     public GraphLoader(ResourceLoader resourceLoader) {
         this.resourceLoader = resourceLoader;
@@ -33,17 +32,16 @@ public class GraphLoader {
             return;
         }
         ObjectMapper mapper = new ObjectMapper(new YAMLFactory());
-        mapper.registerModule(new JavaTimeModule());
         try (InputStream in = resource.getInputStream()) {
-            this.graph = mapper.readValue(in, CertGraph.class);
+            this.graph = mapper.readValue(in, ServiceGraph.class);
         }
     }
 
-    public CertGraph getGraph() {
+    public ServiceGraph getGraph() {
         return graph;
     }
 
-    public void replace(CertGraph newGraph) {
+    public void replace(ServiceGraph newGraph) {
         this.graph = newGraph;
     }
 }

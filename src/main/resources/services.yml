@@ -1,0 +1,203 @@
+services:
+  # === API gateway ===
+  - id: api-gateway
+    name: "API Gateway"
+    kind: gateway
+    group: gateway
+    dependsOn: []
+
+  # === Edge / public-facing ===
+  - id: web-fe-01
+    name: "Web Frontend 01"
+    group: edge
+    loadBalancerPool: web-fe
+    dependsOn:
+      - { target: product-catalog-01, via: api-gateway }
+      - { target: search-01,          via: api-gateway }
+      - { target: cart-svc,           via: api-gateway }
+      - { target: checkout-svc,       via: api-gateway }
+      - { target: user-profile-svc,   via: api-gateway }
+      - { target: auth-svc-01,        via: api-gateway }
+      - { target: recommendations-01, via: api-gateway }
+  - id: web-fe-02
+    name: "Web Frontend 02"
+    group: edge
+    loadBalancerPool: web-fe
+    dependsOn:
+      - { target: product-catalog-02, via: api-gateway }
+      - { target: search-02,          via: api-gateway }
+      - { target: cart-svc,           via: api-gateway }
+      - { target: checkout-svc,       via: api-gateway }
+      - { target: user-profile-svc,   via: api-gateway }
+      - { target: auth-svc-02,        via: api-gateway }
+      - { target: recommendations-02, via: api-gateway }
+  - id: mobile-bff
+    name: "Mobile BFF"
+    group: edge
+    dependsOn:
+      - { target: product-catalog-01, via: api-gateway }
+      - { target: search-01,          via: api-gateway }
+      - { target: cart-svc,           via: api-gateway }
+      - { target: user-profile-svc,   via: api-gateway }
+      - { target: auth-svc-01,        via: api-gateway }
+
+  # === Identity ===
+  - id: auth-svc-01
+    name: "Auth 01"
+    group: identity
+    loadBalancerPool: auth-svc
+    dependsOn:
+      - { target: session-store }
+  - id: auth-svc-02
+    name: "Auth 02"
+    group: identity
+    loadBalancerPool: auth-svc
+    dependsOn:
+      - { target: session-store }
+  - id: session-store
+    name: "Session Store"
+    group: identity
+    dependsOn: []
+  - id: user-profile-svc
+    name: "User Profile"
+    group: identity
+    dependsOn:
+      - { target: auth-svc-01 }
+
+  # === Catalog ===
+  - id: product-catalog-01
+    name: "Product Catalog 01"
+    group: catalog
+    loadBalancerPool: product-catalog
+    dependsOn:
+      - { target: inventory-svc }
+  - id: product-catalog-02
+    name: "Product Catalog 02"
+    group: catalog
+    loadBalancerPool: product-catalog
+    dependsOn:
+      - { target: inventory-svc }
+  - id: product-catalog-03
+    name: "Product Catalog 03"
+    group: catalog
+    loadBalancerPool: product-catalog
+    dependsOn:
+      - { target: inventory-svc }
+  - id: search-01
+    name: "Search 01"
+    group: catalog
+    loadBalancerPool: search
+    dependsOn:
+      - { target: product-catalog-01 }
+  - id: search-02
+    name: "Search 02"
+    group: catalog
+    loadBalancerPool: search
+    dependsOn:
+      - { target: product-catalog-02 }
+  - id: recommendations-01
+    name: "Recommendations 01"
+    group: catalog
+    loadBalancerPool: recommendations
+    dependsOn:
+      - { target: product-catalog-01 }
+      - { target: search-01 }
+  - id: recommendations-02
+    name: "Recommendations 02"
+    group: catalog
+    loadBalancerPool: recommendations
+    dependsOn:
+      - { target: product-catalog-02 }
+      - { target: search-02 }
+
+  # === Orders ===
+  - id: cart-svc
+    name: "Cart"
+    group: orders
+    dependsOn:
+      - { target: product-catalog-01 }
+      - { target: inventory-svc }
+      - { target: auth-svc-01 }
+  - id: checkout-svc
+    name: "Checkout"
+    group: orders
+    dependsOn:
+      - { target: cart-svc }
+      - { target: order-svc-01 }
+      - { target: payment-gw-01 }
+      - { target: inventory-svc }
+  - id: order-svc-01
+    name: "Order Service 01"
+    group: orders
+    loadBalancerPool: order-svc
+    dependsOn:
+      - { target: notification-svc }
+      - { target: shipping-svc }
+      - { target: billing-svc }
+  - id: order-svc-02
+    name: "Order Service 02"
+    group: orders
+    loadBalancerPool: order-svc
+    dependsOn:
+      - { target: notification-svc }
+      - { target: shipping-svc }
+      - { target: billing-svc }
+  - id: payment-gw-01
+    name: "Payment Gateway 01"
+    group: orders
+    loadBalancerPool: payment-gw
+    dependsOn:
+      - { target: notification-svc }
+  - id: payment-gw-02
+    name: "Payment Gateway 02"
+    group: orders
+    loadBalancerPool: payment-gw
+    dependsOn:
+      - { target: notification-svc }
+
+  # === Fulfillment ===
+  - id: inventory-svc
+    name: "Inventory"
+    group: fulfillment
+    dependsOn: []
+  - id: shipping-svc
+    name: "Shipping"
+    group: fulfillment
+    dependsOn:
+      - { target: warehouse-svc }
+      - { target: notification-svc }
+  - id: warehouse-svc
+    name: "Warehouse"
+    group: fulfillment
+    dependsOn: []
+
+  # === Billing ===
+  - id: billing-svc
+    name: "Billing"
+    group: billing
+    dependsOn:
+      - { target: notification-svc }
+
+  # === Comms ===
+  - id: notification-svc
+    name: "Notifications"
+    group: comms
+    dependsOn:
+      - { target: email-svc }
+      - { target: sms-svc }
+  - id: email-svc
+    name: "Email"
+    group: comms
+    dependsOn:
+      - { target: feature-flags }
+  - id: sms-svc
+    name: "SMS"
+    group: comms
+    dependsOn:
+      - { target: feature-flags }
+
+  # === Platform ===
+  - id: feature-flags
+    name: "Feature Flags"
+    group: platform
+    dependsOn: []

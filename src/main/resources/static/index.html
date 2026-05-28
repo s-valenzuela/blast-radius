@@ -2,168 +2,1018 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Cert Graph</title>
-  <script src="https://unpkg.com/vis-network@9.1.9/standalone/umd/vis-network.min.js"></script>
+  <title>Blast Radius</title>
+  <script src="vendor/vis-network.min.js"></script>
   <style>
-    html, body { margin: 0; height: 100%; font-family: -apple-system, Segoe UI, sans-serif; background: #0f172a; color: #e2e8f0; }
-    #app { display: grid; grid-template-columns: 320px 1fr; height: 100vh; }
-    aside { background: #111827; border-right: 1px solid #1f2937; padding: 16px; overflow-y: auto; }
+    :root {
+      --bg-canvas: #0f172a;
+      --bg-sidebar: #111827;
+      --bg-item: #0b1220;
+      --bg-active: #1c1917;
+      --bg-cell-empty: #0b1220;
+      --bg-cell-self: #1f2937;
+      --border: #1f2937;
+      --border-strong: #334155;
+      --text: #e2e8f0;
+      --text-muted: #94a3b8;
+      --text-soft: #cbd5e1;
+      --text-strong: #ffffff;
+      --legend-bg: rgba(17,24,39,.85);
+      --node-service-bg: #1e293b;
+      --node-service-border: #38bdf8;
+      --node-gateway-bg: #312e81;
+      --node-gateway-border: #a78bfa;
+    }
+    [data-theme="light"] {
+      --bg-canvas: #f8fafc;
+      --bg-sidebar: #ffffff;
+      --bg-item: #f1f5f9;
+      --bg-active: #fef3c7;
+      --bg-cell-empty: #f1f5f9;
+      --bg-cell-self: #cbd5e1;
+      --border: #e2e8f0;
+      --border-strong: #94a3b8;
+      --text: #0f172a;
+      --text-muted: #475569;
+      --text-soft: #334155;
+      --text-strong: #000000;
+      --legend-bg: rgba(255,255,255,.92);
+      --node-service-bg: #e0f2fe;
+      --node-service-border: #0284c7;
+      --node-gateway-bg: #ede9fe;
+      --node-gateway-border: #8b5cf6;
+    }
+    html, body { margin: 0; height: 100%; font-family: -apple-system, Segoe UI, sans-serif; background: var(--bg-canvas); color: var(--text); }
+    #app { display: grid; grid-template-columns: 320px 1fr; grid-template-rows: 100vh; height: 100vh; overflow: hidden; }
+    aside { background: var(--bg-sidebar); border-right: 1px solid var(--border); padding: 16px; overflow-y: auto; min-height: 0; }
     aside h1 { font-size: 16px; margin: 0 0 12px; }
-    aside h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: #94a3b8; margin: 18px 0 6px; }
-    main { position: relative; }
-    #network { width: 100%; height: 100%; background: #0f172a; }
-    .cert { display: block; width: 100%; text-align: left; padding: 8px 10px; margin: 4px 0; border-radius: 6px; border: 1px solid #1f2937; background: #0b1220; color: #e2e8f0; cursor: pointer; }
-    .cert:hover { border-color: #38bdf8; }
-    .cert.active { border-color: #f59e0b; background: #1c1917; }
-    .cert .name { font-weight: 600; font-size: 13px; }
-    .cert .meta { font-size: 11px; color: #94a3b8; margin-top: 2px; }
+    aside h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--text-muted); margin: 18px 0 6px; }
+    main { position: relative; min-height: 0; overflow: hidden; }
+    #network { width: 100%; height: 100%; background: var(--bg-canvas); }
+    .item { display: block; width: 100%; text-align: left; padding: 8px 10px; margin: 4px 0; border-radius: 6px; border: 1px solid var(--border); background: var(--bg-item); color: var(--text); cursor: pointer; }
+    .item:hover { border-color: #38bdf8; }
+    .item.active { border-color: #f59e0b; background: var(--bg-active); }
+    .item .name { font-weight: 600; font-size: 13px; }
+    .item .meta { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
     .badge { display: inline-block; font-size: 10px; padding: 2px 6px; border-radius: 10px; margin-left: 6px; }
     .badge.ok { background: #052e16; color: #86efac; }
     .badge.warn { background: #422006; color: #fbbf24; }
     .badge.crit { background: #450a0a; color: #fca5a5; }
+    .badge.kind { background: #312e81; color: #c4b5fd; }
+    [data-theme="light"] .badge.ok { background: #dcfce7; color: #166534; }
+    [data-theme="light"] .badge.warn { background: #fef3c7; color: #854d0e; }
+    [data-theme="light"] .badge.crit { background: #fee2e2; color: #991b1b; }
+    [data-theme="light"] .badge.kind { background: #ede9fe; color: #5b21b6; }
     #impact { font-size: 12px; line-height: 1.5; }
     #impact ul { margin: 4px 0; padding-left: 18px; }
-    #legend { position: absolute; bottom: 12px; left: 12px; background: rgba(17,24,39,.85); border: 1px solid #1f2937; border-radius: 6px; padding: 8px 10px; font-size: 11px; }
-    #legend span.dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
-    #reset { float: right; font-size: 11px; background: #1f2937; color: #cbd5e1; border: 0; padding: 4px 8px; border-radius: 4px; cursor: pointer; }
+    #legend { position: absolute; bottom: 12px; left: 12px; background: var(--legend-bg); border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px; font-size: 11px; }
+    #legend .row { display: flex; align-items: center; gap: 6px; margin: 2px 0; }
+    #legend .swatch { width: 12px; height: 12px; border-radius: 50%; }
+    #legend .swatch.hex { border-radius: 2px; transform: rotate(30deg); }
+    #legend .swatch.dia { border-radius: 2px; transform: rotate(45deg); }
+    #reset, #theme-toggle, #recluster, #upload-yaml { font-size: 11px; background: var(--bg-cell-self); color: var(--text-soft); border: 0; padding: 4px 8px; border-radius: 4px; cursor: pointer; }
+    #recluster { display: block; width: 100%; margin-top: 8px; }
+    #recluster:hover { background: var(--bg-active); }
+    #reset { float: right; }
+    #theme-toggle { float: right; margin-right: 4px; }
+    #upload-yaml { float: right; margin-right: 4px; }
+    #upload-status.ok { color: #86efac; }
+    #upload-status.err { color: #fca5a5; }
+    .tabs { display: flex; gap: 4px; margin-bottom: 8px; }
+    .tab { flex: 1; font-size: 11px; padding: 5px 8px; background: var(--bg-item); color: var(--text-muted); border: 1px solid var(--border); border-radius: 4px; cursor: pointer; }
+    .tab.active { background: var(--bg-active); color: var(--text); border-color: #38bdf8; }
+    #view-toggle { position: absolute; top: 12px; right: 12px; display: flex; gap: 2px; background: var(--bg-sidebar); border: 1px solid var(--border); border-radius: 6px; padding: 2px; z-index: 10; }
+    #view-toggle button { font-size: 11px; padding: 5px 12px; background: transparent; color: var(--text-muted); border: 0; border-radius: 4px; cursor: pointer; }
+    #view-toggle button.active { background: var(--bg-active); color: var(--text); }
+    #matrix-wrap { width: 100%; height: 100%; overflow: auto; padding: 24px; box-sizing: border-box; background: var(--bg-canvas); }
+    .matrix-title { font-size: 13px; color: var(--text-muted); margin-bottom: 14px; }
+    .matrix-title b { color: var(--text); }
+    .matrix-grid { display: inline-grid; gap: 0; }
+    .mcell { width: var(--mcs, 26px); height: var(--mcs, 26px); box-sizing: border-box; border: 1px solid var(--border); background: var(--bg-cell-empty); cursor: pointer; position: relative; }
+    .mcell.self { background: var(--bg-cell-self); cursor: default; }
+    .mcell.direct { background: var(--mc); }
+    .mcell.via { background: var(--mc); opacity: 0.7; background-image: linear-gradient(45deg, transparent 45%, rgba(0,0,0,.35) 45% 55%, transparent 55%); }
+    .mcell.trans { background: var(--mc); opacity: 0.22; }
+    .mcell:hover { outline: 2px solid #f59e0b; outline-offset: -2px; z-index: 5; }
+    .mlabel-col { writing-mode: vertical-rl; transform: rotate(180deg); padding: 6px 4px; font-size: 11px; color: var(--text-soft); text-align: right; white-space: nowrap; cursor: pointer; border-bottom: 1px solid var(--border); }
+    .mlabel-col:hover, .mlabel-row:hover { color: var(--text-strong); background: var(--bg-active); }
+    .mlabel-row { padding: 4px 8px; font-size: 11px; color: var(--text-soft); text-align: right; white-space: nowrap; cursor: pointer; border-right: 1px solid var(--border); }
+    .mlabel-col.active, .mlabel-row.active { color: #f59e0b; background: var(--bg-active); }
+    .mgroup-col { writing-mode: vertical-rl; transform: rotate(180deg); padding: 6px 4px; font-size: 11px; font-weight: 700; text-align: right; white-space: nowrap; cursor: pointer; border-bottom: 2px solid; }
+    .mgroup-row { padding: 4px 8px; font-size: 11px; font-weight: 700; white-space: nowrap; cursor: pointer; border-right: 2px solid; writing-mode: horizontal-tb; display: flex; align-items: center; justify-content: flex-end; }
+    .mblock-vstart { border-left: 2px solid var(--border-strong); }
+    .mblock-hstart { border-top: 2px solid var(--border-strong); }
+    .mhighlight-row .mcell, .mhighlight-col .mcell { filter: brightness(1.35); }
+    [data-theme="light"] .mhighlight-row .mcell, [data-theme="light"] .mhighlight-col .mcell { filter: brightness(0.85) saturate(1.3); }
+    .mlegend { display: flex; gap: 16px; margin-top: 18px; font-size: 11px; color: var(--text-muted); flex-wrap: wrap; }
+    .mlegend .row { display: flex; align-items: center; gap: 6px; }
+    .mlegend .swatch { width: 14px; height: 14px; border-radius: 3px; border: 1px solid var(--border); }
   </style>
 </head>
 <body>
 <div id="app">
   <aside>
-    <h1>Cert Graph <button id="reset">clear</button></h1>
-    <div style="font-size:11px;color:#94a3b8;">Click a certificate to highlight every service that breaks when it expires.</div>
+    <h1>Blast Radius <button id="reset">clear</button><button id="theme-toggle" title="Toggle theme">Light</button><button id="upload-yaml" title="Load a YAML file">Load YAML</button></h1>
+    <div style="font-size:11px;color:#94a3b8;">Click a service to see what it depends on and what depends on it.</div>
+    <input type="file" id="file-input" accept=".yml,.yaml" hidden>
+    <div id="upload-status" style="font-size:11px;margin-top:6px;display:none;"></div>
 
-    <h2>Certificates</h2>
-    <div id="certs"></div>
+    <h2>Services</h2>
+    <div id="services"></div>
 
-    <h2>Impact</h2>
-    <div id="impact">Select a certificate.</div>
+    <h2>Groups</h2>
+    <div id="groups" style="display:flex;flex-wrap:wrap;gap:6px;font-size:11px;"></div>
+
+    <h2>LB pools</h2>
+    <div id="lb-pools" style="display:flex;flex-wrap:wrap;gap:6px;font-size:11px;"></div>
+
+    <h2>Selection</h2>
+    <div id="impact">Select a service.</div>
   </aside>
   <main>
+    <div id="view-toggle">
+      <button data-view="graph" class="active">Graph</button>
+      <button data-view="matrix">Matrix</button>
+    </div>
+    <div id="matrix-wrap" style="display:none;"></div>
     <div id="network"></div>
     <div id="legend">
-      <div><span class="dot" style="background:#f59e0b;"></span>Certificate</div>
-      <div><span class="dot" style="background:#38bdf8;"></span>Service</div>
-      <div><span class="dot" style="background:#ef4444;"></span>Directly affected</div>
-      <div><span class="dot" style="background:#fb923c;"></span>Transitively affected</div>
+      <div class="row"><span class="swatch" style="background:var(--node-service-bg);border:1px solid var(--node-service-border);"></span>Service (no group)</div>
+      <div class="row"><span class="swatch hex" style="background:var(--node-gateway-bg);border:1px solid var(--node-gateway-border);"></span>Gateway (no group)</div>
+      <div class="row"><span class="swatch" style="background:#38bdf8;border:2px solid #38bdf8;"></span>Fill color = group</div>
+      <div class="row"><span class="swatch" style="background:#ef4444;"></span>Directly affected / dep</div>
+      <div class="row"><span class="swatch" style="background:#fb923c;"></span>Transitively affected</div>
+      <div class="row"><svg width="14" height="14" viewBox="0 0 100 100" style="flex-shrink:0;"><polygon points="50,5 95,38 78,92 22,92 5,38" fill="#0b1220" stroke="#94a3b8" stroke-width="8"/></svg>LB pool (double-click to expand)</div>
+      <button id="recluster" title="Re-collapse all LB pools">Re-cluster pools</button>
     </div>
   </main>
 </div>
 
 <script>
-const COLORS = {
-  cert:   { background: '#f59e0b', border: '#b45309', font: '#0f172a' },
-  service:{ background: '#1e293b', border: '#38bdf8', font: '#e2e8f0' },
-  direct: { background: '#ef4444', border: '#7f1d1d', font: '#fff' },
-  trans:  { background: '#fb923c', border: '#7c2d12', font: '#0f172a' },
-  dim:    { background: '#1f2937', border: '#334155', font: '#475569' },
+const COLOR_THEMES = {
+  dark: {
+    service:    { background: '#1e293b', border: '#38bdf8' },
+    gateway:    { background: '#312e81', border: '#a78bfa' },
+    direct:     { background: '#ef4444', border: '#7f1d1d' },
+    trans:      { background: '#fb923c', border: '#7c2d12' },
+    gatewayHit: { background: '#7c3aed', border: '#a78bfa' },
+    dim:        { background: '#1f2937', border: '#334155' },
+  },
+  light: {
+    service:    { background: '#e0f2fe', border: '#0284c7' },
+    gateway:    { background: '#ede9fe', border: '#8b5cf6' },
+    direct:     { background: '#ef4444', border: '#7f1d1d' },
+    trans:      { background: '#fb923c', border: '#7c2d12' },
+    gatewayHit: { background: '#7c3aed', border: '#a78bfa' },
+    dim:        { background: '#e2e8f0', border: '#94a3b8' },
+  },
 };
+let COLORS = COLOR_THEMES.dark;
+
+const LB_ICON_SVG = 'data:image/svg+xml;utf8,' + encodeURIComponent(
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">' +
+  '<polygon points="50,5 95,38 78,92 22,92 5,38" fill="#0b1220" stroke="#94a3b8" stroke-width="6"/>' +
+  '</svg>'
+);
+
+function nodeFontColor() {
+  return document.documentElement.dataset.theme === 'light' ? '#0f172a' : '#e2e8f0';
+}
+
+const ROUTE_PALETTE = ['#22d3ee', '#a78bfa', '#f472b6', '#34d399', '#fbbf24', '#fb7185', '#60a5fa'];
+function routeColor(routeId) {
+  let h = 0;
+  for (let i = 0; i < routeId.length; i++) h = (h * 31 + routeId.charCodeAt(i)) & 0xffff;
+  return ROUTE_PALETTE[h % ROUTE_PALETTE.length];
+}
+
+const GROUP_PALETTE = ['#38bdf8', '#f472b6', '#34d399', '#fbbf24', '#a78bfa', '#fb7185', '#22d3ee', '#facc15', '#c084fc', '#4ade80'];
+const groupColorCache = {};
+function registerGroups(names) {
+  const unique = [...new Set(names.filter(n => n))].sort();
+  const stride = 3;
+  let next = 0;
+  for (const name of unique) {
+    if (groupColorCache[name]) continue;
+    while (Object.values(groupColorCache).includes(GROUP_PALETTE[next % GROUP_PALETTE.length])
+           && next < GROUP_PALETTE.length) next++;
+    groupColorCache[name] = GROUP_PALETTE[next % GROUP_PALETTE.length];
+    next += stride;
+  }
+}
+function groupColor(group) {
+  return group ? groupColorCache[group] || null : null;
+}
+
+function groupCohesionEdges() {
+  const groups = {};
+  for (const n of allNodes) {
+    if (!n.groupName) continue;
+    (groups[n.groupName] = groups[n.groupName] || []).push(n.id);
+  }
+  const edges = [];
+  for (const g in groups) {
+    const ids = groups[g];
+    const length = Math.round(180 * Math.sqrt(ids.length));
+    for (let i = 1; i < ids.length; i++) {
+      edges.push({
+        id: 'cohesion:' + g + ':' + i,
+        from: ids[0],
+        to: ids[i],
+        hidden: true,
+        physics: true,
+        length,
+        color: { opacity: 0 },
+      });
+    }
+  }
+  return edges;
+}
 
 let network, nodesDS, edgesDS;
 let allNodes = [];
+let allEdges = [];
+let selectedGroupName = null;
 
 async function load() {
-  const [graph, certs] = await Promise.all([
+  const [graph, services, matrix] = await Promise.all([
     fetch('/api/graph').then(r => r.json()),
-    fetch('/api/certs').then(r => r.json()),
+    fetch('/api/services').then(r => r.json()),
+    fetch('/api/matrix').then(r => r.json()),
   ]);
-  renderCerts(certs);
+  selectedGroupName = null;
+  document.getElementById('impact').innerHTML = 'Select a service or group.';
+  renderServices(services);
   renderGraph(graph);
+  renderMatrix(matrix);
 }
 
-function renderCerts(certs) {
-  const root = document.getElementById('certs');
-  root.innerHTML = '';
-  certs.sort((a,b) => (a.daysToExpiry||0) - (b.daysToExpiry||0));
-  for (const c of certs) {
-    const btn = document.createElement('button');
-    btn.className = 'cert';
-    btn.dataset.id = c.id;
-    const d = c.daysToExpiry;
-    const cls = d <= 30 ? 'crit' : d <= 90 ? 'warn' : 'ok';
-    const label = d == null ? '—' : (d < 0 ? `expired ${-d}d ago` : `${d}d left`);
-    btn.innerHTML = `<div class="name">${c.name || c.id}<span class="badge ${cls}">${label}</span></div>
-                     <div class="meta">${c.issuer || ''} · expires ${c.expiresOn || '—'}</div>`;
-    btn.onclick = () => selectCert(c.id, btn);
-    root.appendChild(btn);
+async function uploadYaml(file) {
+  const status = document.getElementById('upload-status');
+  status.style.display = 'block';
+  status.className = '';
+  status.textContent = 'Uploading ' + file.name + '…';
+  try {
+    const text = await file.text();
+    const res = await fetch('/api/graph', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-yaml' },
+      body: text,
+    });
+    if (!res.ok) {
+      const msg = await res.text();
+      throw new Error('HTTP ' + res.status + ': ' + msg.slice(0, 200));
+    }
+    const result = await res.json();
+    await load();
+    status.className = 'ok';
+    status.textContent = 'Loaded ' + file.name + ' (' + result.services + ' services).';
+  } catch (e) {
+    status.className = 'err';
+    status.textContent = 'Upload failed: ' + e.message;
   }
 }
 
+let matrixData = null;
+let matrixGateways = new Set();
+let matrixDirect = new Map();
+let matrixVia = new Map();
+let matrixTrans = new Map();
+
+function keypair(a, b) { return a + ' ' + b; }
+
+function computeTransitive(services, deps) {
+  matrixDirect = new Map();
+  matrixVia = new Map();
+  const adj = new Map();
+  for (const s of services) adj.set(s.id, []);
+  for (const d of deps) {
+    const k = keypair(d.from, d.to);
+    if (d.via) matrixVia.set(k, d.via);
+    else matrixDirect.set(k, true);
+    if (adj.has(d.from)) adj.get(d.from).push(d.to);
+  }
+  matrixTrans = new Map();
+  for (const s of services) {
+    const seen = new Set();
+    const stack = (adj.get(s.id) || []).slice();
+    while (stack.length) {
+      const cur = stack.pop();
+      if (seen.has(cur)) continue;
+      seen.add(cur);
+      for (const nx of adj.get(cur) || []) stack.push(nx);
+    }
+    for (const t of seen) {
+      const k = keypair(s.id, t);
+      if (!matrixDirect.has(k) && !matrixVia.has(k)) matrixTrans.set(k, true);
+    }
+  }
+}
+
+function cellKind(fromId, toId) {
+  if (fromId === toId) return 'self';
+  const k = keypair(fromId, toId);
+  if (matrixDirect.has(k)) return 'direct';
+  if (matrixVia.has(k)) return 'via';
+  if (matrixTrans.has(k)) return 'trans';
+  return 'none';
+}
+
+function renderMatrix(data) {
+  matrixData = data;
+  matrixGateways = new Set(data.services.filter(s => s.kind === 'gateway').map(s => s.id));
+  computeTransitive(data.services, data.deps);
+  registerGroups(data.services.map(s => s.group));
+
+  const services = data.services;
+  // Group boundary indices for block borders
+  const groupBoundaries = new Set([0]);
+  for (let i = 1; i < services.length; i++) {
+    if (services[i].group !== services[i - 1].group) groupBoundaries.add(i);
+  }
+
+  const wrap = document.getElementById('matrix-wrap');
+  wrap.innerHTML = '';
+
+  const title = document.createElement('div');
+  title.className = 'matrix-title';
+  title.innerHTML = `<b>Dependency matrix</b> — rows depend on columns. ${services.length} services, ${data.deps.length} declared deps.`;
+  wrap.appendChild(title);
+
+  const grid = document.createElement('div');
+  grid.className = 'matrix-grid';
+  // 1 corner + N service columns. Rows: 1 group header + 1 service col header + N service rows
+  grid.style.gridTemplateColumns = `auto auto repeat(${services.length}, var(--mcs, 26px))`;
+
+  // --- Row 1: group column headers ---
+  appendCell(grid, '', { gridColumn: '1 / span 2' }); // corner
+  let i = 0;
+  while (i < services.length) {
+    let j = i + 1;
+    while (j < services.length && services[j].group === services[i].group) j++;
+    const span = j - i;
+    const g = services[i].group;
+    const c = groupColor(g) || '#475569';
+    const cell = document.createElement('div');
+    cell.className = 'mgroup-col' + (i === 0 ? '' : ' mblock-vstart');
+    cell.style.color = c;
+    cell.style.borderBottomColor = c;
+    cell.style.gridColumn = `${3 + i} / span ${span}`;
+    cell.textContent = g || '—';
+    cell.title = `Group: ${g || '(none)'} (${span} services) — click to highlight block`;
+    cell.onclick = () => highlightMatrixGroup(g);
+    grid.appendChild(cell);
+    i = j;
+  }
+
+  // --- Row 2: per-service column labels ---
+  appendCell(grid, '', {}); // corner top-left of svc rows
+  appendCell(grid, '', {}); // corner
+  for (let c = 0; c < services.length; c++) {
+    const s = services[c];
+    const lbl = document.createElement('div');
+    lbl.className = 'mlabel-col' + (groupBoundaries.has(c) && c > 0 ? ' mblock-vstart' : '');
+    lbl.dataset.col = c;
+    lbl.dataset.id = s.id;
+    lbl.textContent = s.name;
+    lbl.title = `${s.name} (${s.id})\nClick to highlight column (services that depend on this)`;
+    lbl.onclick = () => highlightMatrixCol(c, s);
+    grid.appendChild(lbl);
+  }
+
+  // --- Service rows ---
+  // We track current group so we can emit a single group label spanning its rows
+  let r = 0;
+  while (r < services.length) {
+    let rEnd = r + 1;
+    while (rEnd < services.length && services[rEnd].group === services[r].group) rEnd++;
+    const span = rEnd - r;
+    const g = services[r].group;
+    const c = groupColor(g) || '#475569';
+
+    // Group row label (spans `span` rows)
+    const gLab = document.createElement('div');
+    gLab.className = 'mgroup-row' + (r === 0 ? '' : ' mblock-hstart');
+    gLab.style.color = c;
+    gLab.style.borderRightColor = c;
+    gLab.style.gridRow = `${3 + r} / span ${span}`;
+    gLab.style.gridColumn = '1';
+    gLab.textContent = g || '—';
+    gLab.title = `Group: ${g || '(none)'} (${span} services) — click to highlight block`;
+    gLab.onclick = () => highlightMatrixGroup(g);
+    grid.appendChild(gLab);
+
+    for (let rr = r; rr < rEnd; rr++) {
+      const s = services[rr];
+      const rowLbl = document.createElement('div');
+      rowLbl.className = 'mlabel-row' + (rr === r && rr > 0 ? ' mblock-hstart' : '');
+      rowLbl.style.gridRow = `${3 + rr}`;
+      rowLbl.style.gridColumn = '2';
+      rowLbl.dataset.row = rr;
+      rowLbl.dataset.id = s.id;
+      rowLbl.textContent = s.name;
+      rowLbl.title = `${s.name} (${s.id})\nClick to highlight row (what this depends on)`;
+      rowLbl.onclick = () => highlightMatrixRow(rr, s);
+      grid.appendChild(rowLbl);
+
+      for (let cc = 0; cc < services.length; cc++) {
+        const t = services[cc];
+        const kind = cellKind(s.id, t.id);
+        const cell = document.createElement('div');
+        const cls = ['mcell', kind];
+        if (groupBoundaries.has(cc) && cc > 0) cls.push('mblock-vstart');
+        if (rr === r && rr > 0) cls.push('mblock-hstart');
+        cell.className = cls.join(' ');
+        cell.style.gridRow = `${3 + rr}`;
+        cell.style.gridColumn = `${3 + cc}`;
+        cell.style.setProperty('--mc', groupColor(s.group) || '#38bdf8');
+        cell.dataset.row = rr;
+        cell.dataset.col = cc;
+        if (kind === 'direct') cell.title = `${s.name} → ${t.name}  (direct)`;
+        else if (kind === 'via') cell.title = `${s.name} → ${t.name}  (via ${matrixVia.get(keypair(s.id, t.id))})`;
+        else if (kind === 'trans') cell.title = `${s.name} → ${t.name}  (transitive)`;
+        else if (kind === 'self') cell.title = s.name;
+        else cell.title = `no dep`;
+        if (kind !== 'self' && kind !== 'none') {
+          cell.onclick = () => highlightMatrixCell(rr, cc, s, t, kind);
+        }
+        grid.appendChild(cell);
+      }
+    }
+    r = rEnd;
+  }
+
+  wrap.appendChild(grid);
+
+  const legend = document.createElement('div');
+  legend.className = 'mlegend';
+  legend.innerHTML = `
+    <div class="row"><span class="swatch" style="background:#38bdf8;"></span>direct dep</div>
+    <div class="row"><span class="swatch" style="background:#38bdf8;background-image:linear-gradient(45deg,transparent 45%,rgba(0,0,0,.35) 45% 55%,transparent 55%);"></span>via gateway</div>
+    <div class="row"><span class="swatch" style="background:#38bdf8;opacity:0.22;"></span>transitive</div>
+    <div class="row"><span class="swatch" style="background:#1f2937;"></span>self</div>
+    <div class="row">Cell color = source group color</div>
+  `;
+  wrap.appendChild(legend);
+  if (wrap.offsetWidth > 0) sizeMatrix();
+}
+
+function appendCell(grid, text, styles) {
+  const d = document.createElement('div');
+  if (text) d.textContent = text;
+  for (const k in styles) d.style[k] = styles[k];
+  grid.appendChild(d);
+}
+
+function clearMatrixHighlights() {
+  document.querySelectorAll('.mlabel-row.active, .mlabel-col.active, .mgroup-row.active, .mgroup-col.active').forEach(e => e.classList.remove('active'));
+  document.querySelectorAll('.mhighlight-row, .mhighlight-col').forEach(e => e.classList.remove('mhighlight-row', 'mhighlight-col'));
+}
+
+function highlightMatrixRow(rowIdx, svc) {
+  clearMatrixHighlights();
+  document.querySelectorAll(`.mlabel-row[data-row="${rowIdx}"]`).forEach(e => e.classList.add('active'));
+  document.querySelectorAll(`.mcell[data-row="${rowIdx}"]`).forEach(e => e.classList.add('mhighlight-row'));
+  const targets = matrixData.services.filter((_, c) => {
+    const k = cellKind(svc.id, matrixData.services[c].id);
+    return k === 'direct' || k === 'via';
+  });
+  const trans = matrixData.services.filter((_, c) => cellKind(svc.id, matrixData.services[c].id) === 'trans');
+  document.getElementById('impact').innerHTML = `
+    <div><b>${svc.name}</b> · ${svc.id}<div style="font-size:11px;color:#94a3b8;">${svc.group || ''}</div></div>
+    <div style="margin-top:8px;color:#86efac;font-weight:600;">Depends on (direct/via)</div>
+    ${targets.length ? '<ul>' + targets.map(t => `<li>${t.name}</li>`).join('') + '</ul>' : '<em style="color:#64748b">none</em>'}
+    <div style="margin-top:6px;color:#fdba74;font-weight:600;">Transitive</div>
+    ${trans.length ? '<ul>' + trans.map(t => `<li>${t.name}</li>`).join('') + '</ul>' : '<em style="color:#64748b">none</em>'}
+  `;
+}
+
+function highlightMatrixCol(colIdx, svc) {
+  clearMatrixHighlights();
+  document.querySelectorAll(`.mlabel-col[data-col="${colIdx}"]`).forEach(e => e.classList.add('active'));
+  document.querySelectorAll(`.mcell[data-col="${colIdx}"]`).forEach(e => e.classList.add('mhighlight-col'));
+  const dependents = matrixData.services.filter((_, r) => {
+    const k = cellKind(matrixData.services[r].id, svc.id);
+    return k === 'direct' || k === 'via';
+  });
+  const transDeps = matrixData.services.filter((_, r) => cellKind(matrixData.services[r].id, svc.id) === 'trans');
+  document.getElementById('impact').innerHTML = `
+    <div><b>${svc.name}</b> · ${svc.id}<div style="font-size:11px;color:#94a3b8;">${svc.group || ''}</div></div>
+    <div style="margin-top:8px;color:#fca5a5;font-weight:600;">Depended on by (direct/via)</div>
+    ${dependents.length ? '<ul>' + dependents.map(t => `<li>${t.name}</li>`).join('') + '</ul>' : '<em style="color:#64748b">none</em>'}
+    <div style="margin-top:6px;color:#fdba74;font-weight:600;">Transitive dependents</div>
+    ${transDeps.length ? '<ul>' + transDeps.map(t => `<li>${t.name}</li>`).join('') + '</ul>' : '<em style="color:#64748b">none</em>'}
+  `;
+}
+
+function highlightMatrixCell(r, c, src, tgt, kind) {
+  clearMatrixHighlights();
+  document.querySelectorAll(`.mlabel-row[data-row="${r}"], .mlabel-col[data-col="${c}"]`).forEach(e => e.classList.add('active'));
+  const detail = kind === 'via'
+    ? `via <b style="color:#c4b5fd">${matrixVia.get(keypair(src.id, tgt.id))}</b>`
+    : kind;
+  document.getElementById('impact').innerHTML = `
+    <div><b>${src.name}</b> <span style="color:#94a3b8;">→</span> <b>${tgt.name}</b></div>
+    <div style="margin-top:8px;color:#94a3b8;font-size:11px;">${detail}</div>
+    <div style="margin-top:8px;font-size:11px;color:#94a3b8;">${src.id} → ${tgt.id}</div>
+  `;
+}
+
+function highlightMatrixGroup(groupName) {
+  clearMatrixHighlights();
+  const members = matrixData.services.map((s, i) => s.group === groupName ? i : -1).filter(i => i >= 0);
+  for (const idx of members) {
+    document.querySelectorAll(`.mlabel-row[data-row="${idx}"], .mlabel-col[data-col="${idx}"]`).forEach(e => e.classList.add('active'));
+    document.querySelectorAll(`.mcell[data-row="${idx}"]`).forEach(e => e.classList.add('mhighlight-row'));
+    document.querySelectorAll(`.mcell[data-col="${idx}"]`).forEach(e => e.classList.add('mhighlight-col'));
+  }
+  const color = groupColor(groupName) || '#94a3b8';
+  document.getElementById('impact').innerHTML = `
+    <div><b style="color:${color}">${groupName}</b> &middot; ${members.length} service(s)</div>
+    <div style="margin-top:8px;color:${color};font-weight:600;">Members</div>
+    <ul>${members.map(i => `<li>${matrixData.services[i].name}</li>`).join('')}</ul>
+  `;
+}
+
+function setView(view) {
+  const isMatrix = view === 'matrix';
+  document.getElementById('matrix-wrap').style.display = isMatrix ? '' : 'none';
+  document.getElementById('network').style.display = isMatrix ? 'none' : '';
+  document.getElementById('legend').style.display = isMatrix ? 'none' : '';
+  document.querySelectorAll('#view-toggle button').forEach(b => b.classList.toggle('active', b.dataset.view === view));
+  if (!isMatrix && network) {
+    network.redraw();
+    setTimeout(() => network.fit({ animation: false }), 50);
+  }
+  if (isMatrix) setTimeout(sizeMatrix, 0);
+}
+
+function sizeMatrix() {
+  if (!matrixData) return;
+  const wrap = document.getElementById('matrix-wrap');
+  const grid = wrap.querySelector('.matrix-grid');
+  if (!wrap || !grid || wrap.offsetWidth === 0) return;
+
+  // Measure label/header dims at their natural size first
+  grid.style.removeProperty('--mcs');
+
+  const cs = getComputedStyle(wrap);
+  const padX = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
+  const padY = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
+
+  const title = wrap.querySelector('.matrix-title');
+  const legend = wrap.querySelector('.mlegend');
+  const chromeH = (title ? title.offsetHeight + 14 : 0) + (legend ? legend.offsetHeight + 18 : 0);
+
+  const groupRow = grid.querySelector('.mgroup-row');
+  const labelRow = grid.querySelector('.mlabel-row');
+  const groupCol = grid.querySelector('.mgroup-col');
+  const labelCol = grid.querySelector('.mlabel-col');
+  const labelW = (groupRow ? groupRow.offsetWidth : 0) + (labelRow ? labelRow.offsetWidth : 0);
+  const headerH = (groupCol ? groupCol.offsetHeight : 0) + (labelCol ? labelCol.offsetHeight : 0);
+
+  const availW = wrap.clientWidth - padX - labelW - 4;
+  const availH = wrap.clientHeight - padY - chromeH - headerH - 4;
+  const n = matrixData.services.length || 1;
+  const size = Math.max(20, Math.min(64, Math.floor(Math.min(availW / n, availH / n))));
+  grid.style.setProperty('--mcs', size + 'px');
+}
+
+function nodeColor(n) {
+  const base = n.kind === 'gateway' ? COLORS.gateway : COLORS.service;
+  const gc = groupColor(n.groupName);
+  if (!gc) return base;
+  return { background: gc, border: gc };
+}
+
+function nodeShape(n) {
+  return n.kind === 'gateway' ? 'hexagon' : 'dot';
+}
+
+function nodeSize(n) {
+  return n.kind === 'gateway' ? 26 : 18;
+}
+
+function renderServices(services) {
+  registerGroups(services.map(s => s.groupName));
+  const root = document.getElementById('services');
+  root.innerHTML = '';
+  services.sort((a,b) => (a.name || a.id).localeCompare(b.name || b.id));
+  for (const s of services) {
+    const btn = document.createElement('button');
+    btn.className = 'item';
+    btn.dataset.id = s.id;
+    btn.dataset.kind = 'service';
+    const kindBadge = s.kind && s.kind !== 'service' ? `<span class="badge kind">${s.kind}</span>` : '';
+    const groupBadge = s.groupName
+      ? `<span class="badge" style="background:${groupColor(s.groupName)}22;color:${groupColor(s.groupName)};border:1px solid ${groupColor(s.groupName)}66;">${s.groupName}</span>`
+      : '';
+    btn.innerHTML = `<div class="name">${s.name || s.id}${kindBadge}${groupBadge}</div>
+                     <div class="meta">${s.id}</div>`;
+    btn.onclick = () => selectService(s.id, btn);
+    root.appendChild(btn);
+  }
+  renderGroupLegend(services);
+}
+
+function renderGroupLegend(services) {
+  const root = document.getElementById('groups');
+  root.innerHTML = '';
+  const seen = new Set();
+  for (const s of services) {
+    if (!s.groupName || seen.has(s.groupName)) continue;
+    seen.add(s.groupName);
+    const c = groupColor(s.groupName);
+    const chip = document.createElement('button');
+    chip.dataset.kind = 'group';
+    chip.dataset.id = s.groupName;
+    chip.style.cssText = `display:inline-flex;align-items:center;gap:5px;padding:3px 8px;border-radius:10px;border:1px solid ${c}66;background:${c}1a;color:${c};cursor:pointer;font:inherit;font-size:11px;`;
+    chip.innerHTML = `<span style="width:8px;height:8px;border-radius:50%;background:${c};"></span>${s.groupName}`;
+    chip.onclick = () => selectGroup(s.groupName, chip);
+    root.appendChild(chip);
+  }
+  if (!seen.size) root.innerHTML = '<em style="color:#64748b;">No groups configured.</em>';
+}
+
 function renderGraph(graph) {
+  if (network) { network.destroy(); network = null; }
+  registerGroups(graph.nodes.map(n => n.groupName));
   allNodes = graph.nodes.map(n => ({
     id: n.id,
     label: n.label,
     group: n.group,
+    kind: n.kind,
+    groupName: n.groupName,
+    pool: n.pool || '',
     title: n.title,
-    shape: n.group === 'cert' ? 'diamond' : 'dot',
-    size: n.group === 'cert' ? 22 : 18,
-    color: n.group === 'cert' ? COLORS.cert : COLORS.service,
+    shape: nodeShape(n),
+    size: nodeSize(n),
+    borderWidth: n.groupName ? 4 : 1,
+    color: nodeColor(n),
   }));
-  const edges = graph.edges.map((e, i) => ({
-    id: 'e' + i,
-    from: e.from,
-    to: e.to,
-    arrows: 'to',
-    dashes: e.type === 'uses',
-    color: { color: e.type === 'uses' ? '#b45309' : '#475569' },
-    width: 1,
-  }));
-  nodesDS = new vis.DataSet(allNodes);
-  edgesDS = new vis.DataSet(edges);
-  network = new vis.Network(document.getElementById('network'), { nodes: nodesDS, edges: edgesDS }, {
-    physics: { solver: 'forceAtlas2Based', stabilization: { iterations: 200 } },
-    interaction: { hover: true, tooltipDelay: 150 },
-    nodes: { font: { color: '#e2e8f0', size: 12 } },
-    edges: { smooth: { type: 'continuous' } },
+  allEdges = graph.edges.map((e, i) => {
+    let color, dashes = false, width = 1;
+    if (e.type === 'uses') {
+      color = '#b45309'; dashes = true;
+    } else if (e.route) {
+      color = routeColor(e.route); width = 2;
+    } else {
+      color = '#475569';
+    }
+    return {
+      id: 'e' + i,
+      from: e.from,
+      to: e.to,
+      arrows: 'to',
+      dashes,
+      color: { color, highlight: color },
+      width,
+      route: e.route,
+      etype: e.type,
+      viaTarget: e.viaTarget,
+    };
   });
+  nodesDS = new vis.DataSet(allNodes);
+  edgesDS = new vis.DataSet(allEdges.concat(groupCohesionEdges()));
+  network = new vis.Network(document.getElementById('network'), { nodes: nodesDS, edges: edgesDS }, {
+    physics: {
+      solver: 'forceAtlas2Based',
+      forceAtlas2Based: {
+        gravitationalConstant: -150,
+        centralGravity: 0.005,
+        springLength: 220,
+        springConstant: 0.06,
+        damping: 0.6,
+        avoidOverlap: 0.6,
+      },
+      stabilization: { enabled: true, iterations: 600, updateInterval: 25, fit: true },
+      minVelocity: 0.75,
+    },
+    interaction: { hover: true, tooltipDelay: 150, dragNodes: true },
+    nodes: { font: { color: nodeFontColor(), size: 12 } },
+    edges: { smooth: { type: 'continuous' }, length: 220 },
+  });
+  network.once('stabilizationIterationsDone', () => {
+    network.setOptions({ physics: { enabled: false } });
+  });
+  clusterPools();
   network.on('click', params => {
-    if (params.nodes.length === 1) {
-      const id = params.nodes[0];
-      if (id.startsWith('cert:')) {
-        const certId = id.slice(5);
-        const btn = document.querySelector(`button.cert[data-id="${certId}"]`);
-        selectCert(certId, btn);
-      }
+    if (params.nodes.length !== 1) return;
+    const id = params.nodes[0];
+    if (id.startsWith('svc:')) {
+      const svcId = id.slice(4);
+      const btn = document.querySelector(`button.item[data-kind="service"][data-id="${svcId}"]`);
+      selectService(svcId, btn);
+    }
+  });
+  network.on('doubleClick', params => {
+    if (params.nodes.length !== 1) return;
+    const id = params.nodes[0];
+    if (network.isCluster(id)) {
+      expandCluster(id);
+      return;
+    }
+    const node = nodesDS.get(id);
+    if (node && node.isLbPool) {
+      collapsePool(node.pool);
+      renderLbPools();
     }
   });
 }
 
-async function selectCert(certId, btn) {
-  document.querySelectorAll('.cert.active').forEach(el => el.classList.remove('active'));
+function poolCounts() {
+  const counts = {};
+  for (const n of allNodes) {
+    if (n.pool) counts[n.pool] = (counts[n.pool] || 0) + 1;
+  }
+  return counts;
+}
+
+function clusterOnePool(pool, count) {
+  if (count < 2) return;
+  const lbId = 'lb:' + pool;
+  if (network.isCluster(lbId)) return;
+  network.cluster({
+    joinCondition: (childOptions) => childOptions.pool === pool && !childOptions.isLbPool,
+    clusterNodeProperties: {
+      id: lbId,
+      label: pool + ' (' + count + ')',
+      shape: 'image',
+      image: LB_ICON_SVG,
+      size: 28,
+      font: { color: nodeFontColor(), size: 13 },
+      title: 'LB pool: ' + pool + ' (' + count + ' services) — double-click to expand',
+    },
+  });
+}
+
+function clusterPools() {
+  const counts = poolCounts();
+  for (const pool of Object.keys(counts)) collapsePool(pool);
+  renderLbPools();
+}
+
+function expandCluster(id) {
+  const pool = id.startsWith('lb:') ? id.slice(3) : id;
+  const positions = network.getPositions([id]);
+  const clusterPos = positions[id] || { x: 0, y: 0 };
+  let memberIds = [];
+  network.openCluster(id, {
+    releaseFunction: (cPos, containedPositions) => {
+      const out = {};
+      const ids = Object.keys(containedPositions);
+      memberIds = ids;
+      const radius = Math.max(70, 22 * ids.length);
+      ids.forEach((nid, i) => {
+        const angle = (2 * Math.PI * i) / ids.length - Math.PI / 2;
+        out[nid] = {
+          x: cPos.x + radius * Math.cos(angle),
+          y: cPos.y + radius * Math.sin(angle),
+        };
+      });
+      return out;
+    },
+  });
+  nodesDS.add({
+    id: id,
+    label: pool,
+    shape: 'image',
+    image: LB_ICON_SVG,
+    size: 28,
+    font: { color: nodeFontColor(), size: 13 },
+    title: 'LB pool: ' + pool + ' — double-click to collapse',
+    x: clusterPos.x,
+    y: clusterPos.y,
+    physics: false,
+    isLbPool: true,
+    pool: pool,
+  });
+  edgesDS.add(memberIds.map(mid => ({
+    id: 'lb-edge:' + pool + ':' + mid,
+    from: id,
+    to: mid,
+    dashes: true,
+    arrows: '',
+    color: { color: '#94a3b8', highlight: '#94a3b8', opacity: 0.5 },
+    width: 1,
+    physics: false,
+  })));
+  redirectEdgesForExpandedPools();
+  renderLbPools();
+}
+
+function collapsePool(pool) {
+  const counts = poolCounts();
+  const count = counts[pool];
+  if (!count || count < 2) return;
+  const lbId = 'lb:' + pool;
+  const stale = edgesDS.get({ filter: e => typeof e.id === 'string' && e.id.startsWith('lb-edge:' + pool + ':') });
+  if (stale.length) edgesDS.remove(stale.map(e => e.id));
+  if (nodesDS.get(lbId)) nodesDS.remove(lbId);
+  redirectEdgesForExpandedPools();
+  clusterOnePool(pool, count);
+}
+
+function redirectEdgesForExpandedPools() {
+  const expandedPools = new Set();
+  const counts = poolCounts();
+  for (const pool of Object.keys(counts)) {
+    const lbId = 'lb:' + pool;
+    if (!network.isCluster(lbId) && nodesDS.get(lbId)) expandedPools.add(pool);
+  }
+  const memberToPool = {};
+  for (const n of allNodes) {
+    if (n.pool && expandedPools.has(n.pool)) memberToPool[n.id] = n.pool;
+  }
+  const updates = [];
+  for (const e of allEdges) {
+    const targetPool = memberToPool[e.to];
+    const sourcePool = memberToPool[e.from];
+    const newTo = (targetPool && targetPool !== sourcePool) ? ('lb:' + targetPool) : e.to;
+    const current = edgesDS.get(e.id);
+    if (current && current.to !== newTo) updates.push({ id: e.id, to: newTo });
+  }
+  if (updates.length) edgesDS.update(updates);
+}
+
+function togglePool(pool, count) {
+  const lbId = 'lb:' + pool;
+  if (network.isCluster(lbId)) {
+    expandCluster(lbId);
+  } else {
+    collapsePool(pool);
+    renderLbPools();
+  }
+}
+
+function renderLbPools() {
+  const root = document.getElementById('lb-pools');
+  if (!root) return;
+  root.innerHTML = '';
+  const counts = poolCounts();
+  const pools = Object.keys(counts).filter(p => counts[p] >= 2).sort();
+  if (!pools.length) {
+    root.innerHTML = '<em style="color:#64748b;">No load-balancer pools configured.</em>';
+    return;
+  }
+  for (const pool of pools) {
+    const count = counts[pool];
+    const collapsed = network && network.isCluster && network.isCluster('lb:' + pool);
+    const chip = document.createElement('button');
+    chip.dataset.kind = 'pool';
+    chip.dataset.id = pool;
+    const chev = collapsed ? '▸' : '▾';
+    const bg = collapsed ? '#94a3b822' : 'transparent';
+    chip.style.cssText = `display:inline-flex;align-items:center;gap:5px;padding:3px 8px;border-radius:10px;border:1px solid #94a3b866;background:${bg};color:#cbd5e1;cursor:pointer;font:inherit;font-size:11px;`;
+    chip.innerHTML = `<span style="font-family:monospace;">${chev}</span>${pool} <span style="color:#64748b;">(${count})</span>`;
+    chip.title = collapsed ? `Click to expand "${pool}"` : `Click to collapse "${pool}"`;
+    chip.onclick = () => togglePool(pool, count);
+    root.appendChild(chip);
+  }
+}
+
+function setActive(btn) {
+  document.querySelectorAll('.item.active').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('[data-kind="group"]').forEach(el => { el.style.outline = ''; el.style.outlineOffset = ''; });
+  selectedGroupName = null;
   if (btn) btn.classList.add('active');
+}
 
-  const impact = await fetch(`/api/impact/${encodeURIComponent(certId)}`).then(r => r.json());
-  const directSet = new Set(impact.direct.map(id => 'svc:' + id));
-  const transSet  = new Set(impact.transitive.map(id => 'svc:' + id));
-  const certNode  = 'cert:' + certId;
+function selectGroup(groupName, chipEl) {
+  setActive(null);
+  selectedGroupName = groupName;
+  if (chipEl) {
+    const c = groupColor(groupName);
+    chipEl.style.outline = `2px solid ${c}`;
+    chipEl.style.outlineOffset = '1px';
+  }
 
-  const updates = allNodes.map(n => {
+  const members = new Set(allNodes.filter(n => n.groupName === groupName).map(n => n.id));
+  const nodeUpdates = allNodes.map(n => ({
+    id: n.id,
+    color: members.has(n.id) ? nodeColor(n) : COLORS.dim,
+  }));
+  nodesDS.update(nodeUpdates);
+
+  const edgeUpdates = allEdges.map(e => {
+    const inside = members.has(e.from) && members.has(e.to);
+    const base = e.color.color;
+    return { id: e.id, color: { color: inside ? base : '#1f2937', highlight: base }, width: inside ? 2 : 1 };
+  });
+  edgesDS.update(edgeUpdates);
+
+  const color = groupColor(groupName);
+  const memberItems = allNodes
+    .filter(n => n.groupName === groupName)
+    .sort((a, b) => (a.label || '').localeCompare(b.label || ''))
+    .map(n => `<li>${n.label}</li>`)
+    .join('');
+  document.getElementById('impact').innerHTML = `
+    <div><b style="color:${color}">${groupName}</b> &middot; ${members.size} service(s)</div>
+    <div style="margin-top:8px;color:${color};font-weight:600;">Members</div>
+    <ul>${memberItems}</ul>
+  `;
+}
+
+async function selectService(svcId, btn) {
+  setActive(btn);
+
+  const r = await fetch(`/api/service/${encodeURIComponent(svcId)}`).then(r => r.json());
+  const self = 'svc:' + svcId;
+  const directSet = new Set(r.direct.map(id => 'svc:' + id));
+  const viaTargets = new Set();
+  const viaGateways = new Set();
+  for (const v of r.via) { viaTargets.add('svc:' + v.target); viaGateways.add('svc:' + v.via); }
+  const transSet = new Set(r.transitive.map(id => 'svc:' + id));
+  const impactDirectSet = new Set((r.impactedDirect || []).map(id => 'svc:' + id));
+  const impactTransSet = new Set((r.impactedTransitive || []).map(id => 'svc:' + id));
+
+  const nodeUpdates = allNodes.map(n => {
     let color = COLORS.dim;
-    if (n.id === certNode)        color = COLORS.cert;
-    else if (directSet.has(n.id)) color = COLORS.direct;
-    else if (transSet.has(n.id))  color = COLORS.trans;
+    if (n.id === self)                 color = nodeColor(n);
+    else if (directSet.has(n.id))      color = COLORS.direct;
+    else if (viaTargets.has(n.id))     color = COLORS.direct;
+    else if (viaGateways.has(n.id))    color = COLORS.gatewayHit;
+    else if (impactDirectSet.has(n.id)) color = COLORS.direct;
+    else if (transSet.has(n.id))       color = COLORS.trans;
+    else if (impactTransSet.has(n.id)) color = COLORS.trans;
     return { id: n.id, color };
   });
-  nodesDS.update(updates);
+  nodesDS.update(nodeUpdates);
+
+  // highlight outgoing edges from self, gateway->target legs, and incoming edges from upstream impact
+  const edgeUpdates = allEdges.map(e => {
+    let dim = true;
+    if (e.from === self) dim = false;
+    if (e.etype === 'routes' && viaGateways.has(e.from) && viaTargets.has(e.to)) dim = false;
+    if (e.to === self && impactDirectSet.has(e.from)) dim = false;
+    const base = e.color.color;
+    return { id: e.id, color: { color: dim ? '#1f2937' : base, highlight: base }, width: dim ? 1 : 2 };
+  });
+  edgesDS.update(edgeUpdates);
 
   const list = (ids) => ids.length
     ? '<ul>' + ids.map(i => `<li>${i}</li>`).join('') + '</ul>'
     : '<em style="color:#64748b">none</em>';
+  const routeList = (rs) => rs.length
+    ? '<ul>' + rs.map(v => `<li>${v.target} <span style="color:#94a3b8">via</span> <b style="color:#c4b5fd">${v.via}</b></li>`).join('') + '</ul>'
+    : '<em style="color:#64748b">none</em>';
+  const kindBadge = r.kind && r.kind !== 'service' ? `<span class="badge kind">${r.kind}</span>` : '';
+
   document.getElementById('impact').innerHTML = `
-    <div><b>${certId}</b> &middot; ${impact.totalServices} service(s) affected</div>
-    <div style="margin-top:8px;color:#fca5a5;font-weight:600;">Directly affected</div>
-    ${list(impact.direct)}
-    <div style="margin-top:6px;color:#fdba74;font-weight:600;">Transitively affected</div>
-    ${list(impact.transitive)}
+    <div><b>${r.name || svcId}</b> ${kindBadge}<div style="font-size:11px;color:#94a3b8;">${svcId}</div></div>
+    <div style="margin-top:8px;color:#86efac;font-weight:600;">Direct dependencies</div>
+    ${list(r.direct)}
+    <div style="margin-top:6px;color:#c4b5fd;font-weight:600;">Routed (via gateway)</div>
+    ${routeList(r.via)}
+    <div style="margin-top:6px;color:#fdba74;font-weight:600;">Transitive</div>
+    ${list(r.transitive)}
+    <div style="margin-top:10px;color:#fca5a5;font-weight:600;">Impacted if this is down (direct)</div>
+    ${list(r.impactedDirect || [])}
+    <div style="margin-top:6px;color:#fdba74;font-weight:600;">Impacted if this is down (transitive)</div>
+    ${list(r.impactedTransitive || [])}
   `;
 }
 
-document.getElementById('reset').onclick = () => {
-  document.querySelectorAll('.cert.active').forEach(el => el.classList.remove('active'));
-  document.getElementById('impact').innerHTML = 'Select a certificate.';
-  nodesDS.update(allNodes.map(n => ({ id: n.id, color: n.group === 'cert' ? COLORS.cert : COLORS.service })));
+function resetView() {
+  setActive(null);
+  clearMatrixHighlights();
+  document.getElementById('impact').innerHTML = 'Select a service or group.';
+  if (nodesDS) nodesDS.update(allNodes.map(n => ({ id: n.id, color: nodeColor(n) })));
+  if (edgesDS) edgesDS.update(allEdges.map(e => ({ id: e.id, color: e.color, width: e.route ? 2 : 1 })));
+}
+
+function applyTheme(theme) {
+  document.documentElement.dataset.theme = theme;
+  COLORS = COLOR_THEMES[theme] || COLOR_THEMES.dark;
+  const btn = document.getElementById('theme-toggle');
+  if (btn) btn.textContent = theme === 'light' ? 'Dark' : 'Light';
+  try { localStorage.setItem('blast-radius-theme', theme); } catch (e) {}
+  if (network) {
+    network.setOptions({ nodes: { font: { color: nodeFontColor() } } });
+  }
+  if (nodesDS && allNodes.length) {
+    nodesDS.update(allNodes.map(n => ({ id: n.id, color: nodeColor(n) })));
+  }
+}
+
+document.getElementById('reset').onclick = resetView;
+document.getElementById('theme-toggle').onclick = () => applyTheme(document.documentElement.dataset.theme === 'light' ? 'dark' : 'light');
+document.getElementById('recluster').onclick = () => clusterPools();
+document.getElementById('upload-yaml').onclick = () => document.getElementById('file-input').click();
+document.getElementById('file-input').onchange = (ev) => {
+  const file = ev.target.files && ev.target.files[0];
+  if (file) uploadYaml(file);
+  ev.target.value = '';
 };
+document.querySelectorAll('#view-toggle button').forEach(b => b.onclick = () => setView(b.dataset.view));
+window.addEventListener('resize', () => { if (document.getElementById('matrix-wrap').offsetWidth > 0) sizeMatrix(); });
+
+(function initTheme() {
+  let saved = 'dark';
+  try { saved = localStorage.getItem('blast-radius-theme') || 'dark'; } catch (e) {}
+  applyTheme(saved);
+})();
 
 load();
 </script>

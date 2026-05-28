@@ -3,7 +3,7 @@ server:
 
 spring:
   application:
-    name: cert-graph
+    name: blast-radius
 
-certgraph:
-  source: classpath:certs.yml
+blastradius:
+  source: classpath:services.yml
