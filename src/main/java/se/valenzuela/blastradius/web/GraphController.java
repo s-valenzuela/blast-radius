@@ -5,6 +5,7 @@ import se.valenzuela.blastradius.model.Dependency;
 import se.valenzuela.blastradius.model.ServiceNode;
 import se.valenzuela.blastradius.service.GraphLoader;
 import se.valenzuela.blastradius.service.ImpactAnalyzer;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import org.springframework.http.MediaType;
@@ -31,7 +32,8 @@ public class GraphController {
     public GraphController(GraphLoader loader, ImpactAnalyzer analyzer) {
         this.loader = loader;
         this.analyzer = analyzer;
-        this.yamlMapper = new ObjectMapper(new YAMLFactory());
+        this.yamlMapper = new ObjectMapper(new YAMLFactory())
+                .setSerializationInclusion(JsonInclude.Include.NON_EMPTY);
     }
 
     @GetMapping("/graph")
@@ -97,7 +99,7 @@ public class GraphController {
     }
 
     @GetMapping("/service/{serviceId}")
-    public Map<String, Object> service(@PathVariable String serviceId) {
+    public Map<String, Object> service(@PathVariable("serviceId") String serviceId) {
         ImpactAnalyzer.ServiceDependencies d = analyzer.analyzeService(serviceId);
         ServiceNode self = null;
         for (ServiceNode s : loader.getGraph().getServices()) {
@@ -164,5 +166,10 @@ public class GraphController {
         ServiceGraph g = yamlMapper.readValue(yaml, ServiceGraph.class);
         loader.replace(g);
         return Map.of("services", g.getServices().size());
+    }
+
+    @GetMapping(value = "/yaml", produces = "application/x-yaml;charset=UTF-8")
+    public String exportYaml() throws Exception {
+        return yamlMapper.writeValueAsString(loader.getGraph());
     }
 }

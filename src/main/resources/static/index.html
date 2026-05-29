@@ -4,114 +4,12 @@
   <meta charset="UTF-8" />
   <title>Blast Radius</title>
   <script src="vendor/vis-network.min.js"></script>
-  <style>
-    :root {
-      --bg-canvas: #0f172a;
-      --bg-sidebar: #111827;
-      --bg-item: #0b1220;
-      --bg-active: #1c1917;
-      --bg-cell-empty: #0b1220;
-      --bg-cell-self: #1f2937;
-      --border: #1f2937;
-      --border-strong: #334155;
-      --text: #e2e8f0;
-      --text-muted: #94a3b8;
-      --text-soft: #cbd5e1;
-      --text-strong: #ffffff;
-      --legend-bg: rgba(17,24,39,.85);
-      --node-service-bg: #1e293b;
-      --node-service-border: #38bdf8;
-      --node-gateway-bg: #312e81;
-      --node-gateway-border: #a78bfa;
-    }
-    [data-theme="light"] {
-      --bg-canvas: #f8fafc;
-      --bg-sidebar: #ffffff;
-      --bg-item: #f1f5f9;
-      --bg-active: #fef3c7;
-      --bg-cell-empty: #f1f5f9;
-      --bg-cell-self: #cbd5e1;
-      --border: #e2e8f0;
-      --border-strong: #94a3b8;
-      --text: #0f172a;
-      --text-muted: #475569;
-      --text-soft: #334155;
-      --text-strong: #000000;
-      --legend-bg: rgba(255,255,255,.92);
-      --node-service-bg: #e0f2fe;
-      --node-service-border: #0284c7;
-      --node-gateway-bg: #ede9fe;
-      --node-gateway-border: #8b5cf6;
-    }
-    html, body { margin: 0; height: 100%; font-family: -apple-system, Segoe UI, sans-serif; background: var(--bg-canvas); color: var(--text); }
-    #app { display: grid; grid-template-columns: 320px 1fr; grid-template-rows: 100vh; height: 100vh; overflow: hidden; }
-    aside { background: var(--bg-sidebar); border-right: 1px solid var(--border); padding: 16px; overflow-y: auto; min-height: 0; }
-    aside h1 { font-size: 16px; margin: 0 0 12px; }
-    aside h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--text-muted); margin: 18px 0 6px; }
-    main { position: relative; min-height: 0; overflow: hidden; }
-    #network { width: 100%; height: 100%; background: var(--bg-canvas); }
-    .item { display: block; width: 100%; text-align: left; padding: 8px 10px; margin: 4px 0; border-radius: 6px; border: 1px solid var(--border); background: var(--bg-item); color: var(--text); cursor: pointer; }
-    .item:hover { border-color: #38bdf8; }
-    .item.active { border-color: #f59e0b; background: var(--bg-active); }
-    .item .name { font-weight: 600; font-size: 13px; }
-    .item .meta { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
-    .badge { display: inline-block; font-size: 10px; padding: 2px 6px; border-radius: 10px; margin-left: 6px; }
-    .badge.ok { background: #052e16; color: #86efac; }
-    .badge.warn { background: #422006; color: #fbbf24; }
-    .badge.crit { background: #450a0a; color: #fca5a5; }
-    .badge.kind { background: #312e81; color: #c4b5fd; }
-    [data-theme="light"] .badge.ok { background: #dcfce7; color: #166534; }
-    [data-theme="light"] .badge.warn { background: #fef3c7; color: #854d0e; }
-    [data-theme="light"] .badge.crit { background: #fee2e2; color: #991b1b; }
-    [data-theme="light"] .badge.kind { background: #ede9fe; color: #5b21b6; }
-    #impact { font-size: 12px; line-height: 1.5; }
-    #impact ul { margin: 4px 0; padding-left: 18px; }
-    #legend { position: absolute; bottom: 12px; left: 12px; background: var(--legend-bg); border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px; font-size: 11px; }
-    #legend .row { display: flex; align-items: center; gap: 6px; margin: 2px 0; }
-    #legend .swatch { width: 12px; height: 12px; border-radius: 50%; }
-    #legend .swatch.hex { border-radius: 2px; transform: rotate(30deg); }
-    #legend .swatch.dia { border-radius: 2px; transform: rotate(45deg); }
-    #reset, #theme-toggle, #recluster, #upload-yaml { font-size: 11px; background: var(--bg-cell-self); color: var(--text-soft); border: 0; padding: 4px 8px; border-radius: 4px; cursor: pointer; }
-    #recluster { display: block; width: 100%; margin-top: 8px; }
-    #recluster:hover { background: var(--bg-active); }
-    #reset { float: right; }
-    #theme-toggle { float: right; margin-right: 4px; }
-    #upload-yaml { float: right; margin-right: 4px; }
-    #upload-status.ok { color: #86efac; }
-    #upload-status.err { color: #fca5a5; }
-    .tabs { display: flex; gap: 4px; margin-bottom: 8px; }
-    .tab { flex: 1; font-size: 11px; padding: 5px 8px; background: var(--bg-item); color: var(--text-muted); border: 1px solid var(--border); border-radius: 4px; cursor: pointer; }
-    .tab.active { background: var(--bg-active); color: var(--text); border-color: #38bdf8; }
-    #view-toggle { position: absolute; top: 12px; right: 12px; display: flex; gap: 2px; background: var(--bg-sidebar); border: 1px solid var(--border); border-radius: 6px; padding: 2px; z-index: 10; }
-    #view-toggle button { font-size: 11px; padding: 5px 12px; background: transparent; color: var(--text-muted); border: 0; border-radius: 4px; cursor: pointer; }
-    #view-toggle button.active { background: var(--bg-active); color: var(--text); }
-    #matrix-wrap { width: 100%; height: 100%; overflow: auto; padding: 24px; box-sizing: border-box; background: var(--bg-canvas); }
-    .matrix-title { font-size: 13px; color: var(--text-muted); margin-bottom: 14px; }
-    .matrix-title b { color: var(--text); }
-    .matrix-grid { display: inline-grid; gap: 0; }
-    .mcell { width: var(--mcs, 26px); height: var(--mcs, 26px); box-sizing: border-box; border: 1px solid var(--border); background: var(--bg-cell-empty); cursor: pointer; position: relative; }
-    .mcell.self { background: var(--bg-cell-self); cursor: default; }
-    .mcell.direct { background: var(--mc); }
-    .mcell.via { background: var(--mc); opacity: 0.7; background-image: linear-gradient(45deg, transparent 45%, rgba(0,0,0,.35) 45% 55%, transparent 55%); }
-    .mcell.trans { background: var(--mc); opacity: 0.22; }
-    .mcell:hover { outline: 2px solid #f59e0b; outline-offset: -2px; z-index: 5; }
-    .mlabel-col { writing-mode: vertical-rl; transform: rotate(180deg); padding: 6px 4px; font-size: 11px; color: var(--text-soft); text-align: right; white-space: nowrap; cursor: pointer; border-bottom: 1px solid var(--border); }
-    .mlabel-col:hover, .mlabel-row:hover { color: var(--text-strong); background: var(--bg-active); }
-    .mlabel-row { padding: 4px 8px; font-size: 11px; color: var(--text-soft); text-align: right; white-space: nowrap; cursor: pointer; border-right: 1px solid var(--border); }
-    .mlabel-col.active, .mlabel-row.active { color: #f59e0b; background: var(--bg-active); }
-    .mgroup-col { writing-mode: vertical-rl; transform: rotate(180deg); padding: 6px 4px; font-size: 11px; font-weight: 700; text-align: right; white-space: nowrap; cursor: pointer; border-bottom: 2px solid; }
-    .mgroup-row { padding: 4px 8px; font-size: 11px; font-weight: 700; white-space: nowrap; cursor: pointer; border-right: 2px solid; writing-mode: horizontal-tb; display: flex; align-items: center; justify-content: flex-end; }
-    .mblock-vstart { border-left: 2px solid var(--border-strong); }
-    .mblock-hstart { border-top: 2px solid var(--border-strong); }
-    .mhighlight-row .mcell, .mhighlight-col .mcell { filter: brightness(1.35); }
-    [data-theme="light"] .mhighlight-row .mcell, [data-theme="light"] .mhighlight-col .mcell { filter: brightness(0.85) saturate(1.3); }
-    .mlegend { display: flex; gap: 16px; margin-top: 18px; font-size: 11px; color: var(--text-muted); flex-wrap: wrap; }
-    .mlegend .row { display: flex; align-items: center; gap: 6px; }
-    .mlegend .swatch { width: 14px; height: 14px; border-radius: 3px; border: 1px solid var(--border); }
-  </style>
+  <script src="vendor/js-yaml.min.js"></script>
+  <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
 <div id="app">
+  <button id="sidebar-toggle" title="Hide sidebar">◀</button>
   <aside>
     <h1>Blast Radius <button id="reset">clear</button><button id="theme-toggle" title="Toggle theme">Light</button><button id="upload-yaml" title="Load a YAML file">Load YAML</button></h1>
     <div style="font-size:11px;color:#94a3b8;">Click a service to see what it depends on and what depends on it.</div>
@@ -131,15 +29,19 @@
     <div id="impact">Select a service.</div>
   </aside>
   <main>
-    <div id="view-toggle">
-      <button data-view="graph" class="active">Graph</button>
-      <button data-view="matrix">Matrix</button>
+    <div id="main-toolbar">
+      <button id="edit-yaml" title="Edit the current YAML">Edit YAML</button>
+      <div id="view-toggle">
+        <button data-view="graph" class="active">Graph</button>
+        <button data-view="matrix">Matrix</button>
+      </div>
     </div>
     <div id="matrix-wrap" style="display:none;"></div>
     <div id="network"></div>
     <div id="legend">
       <div class="row"><span class="swatch" style="background:var(--node-service-bg);border:1px solid var(--node-service-border);"></span>Service (no group)</div>
       <div class="row"><span class="swatch hex" style="background:var(--node-gateway-bg);border:1px solid var(--node-gateway-border);"></span>Gateway (no group)</div>
+      <div class="row"><span class="swatch" style="background:var(--node-db-bg);border:1px solid var(--node-db-border);border-radius:2px;"></span>Database (no group)</div>
       <div class="row"><span class="swatch" style="background:#38bdf8;border:2px solid #38bdf8;"></span>Fill color = group</div>
       <div class="row"><span class="swatch" style="background:#ef4444;"></span>Directly affected / dep</div>
       <div class="row"><span class="swatch" style="background:#fb923c;"></span>Transitively affected</div>
@@ -147,6 +49,19 @@
       <button id="recluster" title="Re-collapse all LB pools">Re-cluster pools</button>
     </div>
   </main>
+  <section id="yaml-panel">
+    <div id="yaml-panel-header">
+      <h3>Edit YAML</h3>
+      <button id="yaml-close" title="Close panel">×</button>
+    </div>
+    <textarea id="yaml-text" spellcheck="false" wrap="off"></textarea>
+    <div id="yaml-lint" class="lint-status"></div>
+    <div class="panel-actions">
+      <button id="yaml-cancel">Cancel</button>
+      <button id="yaml-save" disabled>Save</button>
+    </div>
+  </section>
+  <button id="yaml-toggle" title="Hide YAML panel">▶</button>
 </div>
 
 <script>
@@ -154,6 +69,7 @@ const COLOR_THEMES = {
   dark: {
     service:    { background: '#1e293b', border: '#38bdf8' },
     gateway:    { background: '#312e81', border: '#a78bfa' },
+    database:   { background: '#0c4a4a', border: '#94a3b8' },
     direct:     { background: '#ef4444', border: '#7f1d1d' },
     trans:      { background: '#fb923c', border: '#7c2d12' },
     gatewayHit: { background: '#7c3aed', border: '#a78bfa' },
@@ -162,6 +78,7 @@ const COLOR_THEMES = {
   light: {
     service:    { background: '#e0f2fe', border: '#0284c7' },
     gateway:    { background: '#ede9fe', border: '#8b5cf6' },
+    database:   { background: '#ccfbf1', border: '#64748b' },
     direct:     { background: '#ef4444', border: '#7f1d1d' },
     trans:      { background: '#fb923c', border: '#7c2d12' },
     gatewayHit: { background: '#7c3aed', border: '#a78bfa' },
@@ -170,11 +87,37 @@ const COLOR_THEMES = {
 };
 let COLORS = COLOR_THEMES.dark;
 
-const LB_ICON_SVG = 'data:image/svg+xml;utf8,' + encodeURIComponent(
-  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">' +
-  '<polygon points="50,5 95,38 78,92 22,92 5,38" fill="#0b1220" stroke="#94a3b8" stroke-width="6"/>' +
-  '</svg>'
-);
+function lbIconWithStroke(stroke) {
+  return 'data:image/svg+xml;utf8,' + encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">' +
+    '<polygon points="50,5 95,38 78,92 22,92 5,38" fill="#0b1220" stroke="' + stroke + '" stroke-width="6"/>' +
+    '</svg>'
+  );
+}
+const LB_ICON_SVG    = lbIconWithStroke('#94a3b8');
+const LB_ICON_DIRECT = lbIconWithStroke('#ef4444');
+const LB_ICON_TRANS  = lbIconWithStroke('#fb923c');
+
+function colorPoolsForImpact(directSet, transSet) {
+  const pools = {};
+  for (const n of allNodes) {
+    if (!n.pool) continue;
+    (pools[n.pool] = pools[n.pool] || []).push(n.id);
+  }
+  for (const pool of Object.keys(pools)) {
+    let img = LB_ICON_SVG;
+    for (const id of pools[pool]) {
+      if (directSet.has(id)) { img = LB_ICON_DIRECT; break; }
+      if (transSet.has(id)) img = LB_ICON_TRANS;
+    }
+    const lbId = 'lb:' + pool;
+    if (network && network.isCluster && network.isCluster(lbId)) {
+      if (network.updateClusteredNode) network.updateClusteredNode(lbId, { image: img });
+    } else if (nodesDS && nodesDS.get(lbId)) {
+      nodesDS.update({ id: lbId, image: img });
+    }
+  }
+}
 
 function nodeFontColor() {
   return document.documentElement.dataset.theme === 'light' ? '#0f172a' : '#e2e8f0';
@@ -233,7 +176,7 @@ function groupCohesionEdges() {
 let network, nodesDS, edgesDS;
 let allNodes = [];
 let allEdges = [];
-let selectedGroupName = null;
+let selectedGroupNames = new Set();
 
 async function load() {
   const [graph, services, matrix] = await Promise.all([
@@ -580,38 +523,76 @@ function sizeMatrix() {
 }
 
 function nodeColor(n) {
-  const base = n.kind === 'gateway' ? COLORS.gateway : COLORS.service;
+  const base = n.kind === 'gateway' ? COLORS.gateway
+             : n.kind === 'database' ? COLORS.database
+             : COLORS.service;
   const gc = groupColor(n.groupName);
   if (!gc) return base;
+  if (n.kind === 'database') return { background: gc, border: base.border };
   return { background: gc, border: gc };
 }
 
 function nodeShape(n) {
-  return n.kind === 'gateway' ? 'hexagon' : 'dot';
+  if (n.kind === 'gateway') return 'hexagon';
+  if (n.kind === 'database') return 'database';
+  return 'dot';
 }
 
 function nodeSize(n) {
-  return n.kind === 'gateway' ? 26 : 18;
+  if (n.kind === 'gateway') return 26;
+  if (n.kind === 'database') return 14;
+  return 18;
 }
 
 function renderServices(services) {
   registerGroups(services.map(s => s.groupName));
   const root = document.getElementById('services');
   root.innerHTML = '';
-  services.sort((a,b) => (a.name || a.id).localeCompare(b.name || b.id));
+
+  const byGroup = {};
   for (const s of services) {
-    const btn = document.createElement('button');
-    btn.className = 'item';
-    btn.dataset.id = s.id;
-    btn.dataset.kind = 'service';
-    const kindBadge = s.kind && s.kind !== 'service' ? `<span class="badge kind">${s.kind}</span>` : '';
-    const groupBadge = s.groupName
-      ? `<span class="badge" style="background:${groupColor(s.groupName)}22;color:${groupColor(s.groupName)};border:1px solid ${groupColor(s.groupName)}66;">${s.groupName}</span>`
-      : '';
-    btn.innerHTML = `<div class="name">${s.name || s.id}${kindBadge}${groupBadge}</div>
-                     <div class="meta">${s.id}</div>`;
-    btn.onclick = () => selectService(s.id, btn);
-    root.appendChild(btn);
+    const g = s.groupName || 'root';
+    (byGroup[g] = byGroup[g] || []).push(s);
+  }
+  const groupNames = Object.keys(byGroup).sort();
+
+  for (const g of groupNames) {
+    byGroup[g].sort((a,b) => (a.name || a.id).localeCompare(b.name || b.id));
+    const dotColor = (g === 'root' ? null : groupColor(g)) || '#64748b';
+
+    const groupRoot = document.createElement('div');
+    groupRoot.className = 'svc-group collapsed';
+    groupRoot.dataset.group = g;
+
+    const header = document.createElement('button');
+    header.className = 'svc-group-header';
+    header.innerHTML =
+      `<span class="chev">▸</span>` +
+      `<span class="dot" style="background:${dotColor};"></span>` +
+      `<span class="gname">${g}</span>` +
+      `<span class="count">${byGroup[g].length}</span>`;
+    header.onclick = () => {
+      const collapsed = groupRoot.classList.toggle('collapsed');
+      header.querySelector('.chev').textContent = collapsed ? '▸' : '▾';
+    };
+
+    const body = document.createElement('div');
+    body.className = 'svc-group-body';
+    for (const s of byGroup[g]) {
+      const btn = document.createElement('button');
+      btn.className = 'item';
+      btn.dataset.id = s.id;
+      btn.dataset.kind = 'service';
+      const kindBadge = s.kind && s.kind !== 'service' ? `<span class="badge kind">${s.kind}</span>` : '';
+      btn.innerHTML = `<div class="name">${s.name || s.id}${kindBadge}</div>
+                       <div class="meta">${s.id}</div>`;
+      btn.onclick = () => selectService(s.id, btn);
+      body.appendChild(btn);
+    }
+
+    groupRoot.appendChild(header);
+    groupRoot.appendChild(body);
+    root.appendChild(groupRoot);
   }
   renderGroupLegend(services);
 }
@@ -629,7 +610,7 @@ function renderGroupLegend(services) {
     chip.dataset.id = s.groupName;
     chip.style.cssText = `display:inline-flex;align-items:center;gap:5px;padding:3px 8px;border-radius:10px;border:1px solid ${c}66;background:${c}1a;color:${c};cursor:pointer;font:inherit;font-size:11px;`;
     chip.innerHTML = `<span style="width:8px;height:8px;border-radius:50%;background:${c};"></span>${s.groupName}`;
-    chip.onclick = () => selectGroup(s.groupName, chip);
+    chip.onclick = (ev) => selectGroup(s.groupName, chip, ev.ctrlKey || ev.metaKey || ev.shiftKey);
     root.appendChild(chip);
   }
   if (!seen.size) root.innerHTML = '<em style="color:#64748b;">No groups configured.</em>';
@@ -875,20 +856,46 @@ function renderLbPools() {
 function setActive(btn) {
   document.querySelectorAll('.item.active').forEach(el => el.classList.remove('active'));
   document.querySelectorAll('[data-kind="group"]').forEach(el => { el.style.outline = ''; el.style.outlineOffset = ''; });
-  selectedGroupName = null;
-  if (btn) btn.classList.add('active');
+  selectedGroupNames.clear();
+  if (btn) {
+    btn.classList.add('active');
+    const group = btn.closest('.svc-group');
+    if (group && group.classList.contains('collapsed')) {
+      group.classList.remove('collapsed');
+      const chev = group.querySelector('.chev');
+      if (chev) chev.textContent = '▾';
+    }
+  }
 }
 
-function selectGroup(groupName, chipEl) {
-  setActive(null);
-  selectedGroupName = groupName;
-  if (chipEl) {
-    const c = groupColor(groupName);
-    chipEl.style.outline = `2px solid ${c}`;
-    chipEl.style.outlineOffset = '1px';
+function selectGroup(groupName, chipEl, additive) {
+  document.querySelectorAll('.item.active').forEach(el => el.classList.remove('active'));
+
+  if (additive) {
+    if (selectedGroupNames.has(groupName)) selectedGroupNames.delete(groupName);
+    else selectedGroupNames.add(groupName);
+  } else {
+    selectedGroupNames.clear();
+    selectedGroupNames.add(groupName);
   }
 
-  const members = new Set(allNodes.filter(n => n.groupName === groupName).map(n => n.id));
+  document.querySelectorAll('[data-kind="group"]').forEach(el => {
+    if (selectedGroupNames.has(el.dataset.id)) {
+      const c = groupColor(el.dataset.id);
+      el.style.outline = `2px solid ${c}`;
+      el.style.outlineOffset = '1px';
+    } else {
+      el.style.outline = '';
+      el.style.outlineOffset = '';
+    }
+  });
+
+  if (selectedGroupNames.size === 0) {
+    resetView();
+    return;
+  }
+
+  const members = new Set(allNodes.filter(n => selectedGroupNames.has(n.groupName)).map(n => n.id));
   const nodeUpdates = allNodes.map(n => ({
     id: n.id,
     color: members.has(n.id) ? nodeColor(n) : COLORS.dim,
@@ -902,16 +909,20 @@ function selectGroup(groupName, chipEl) {
   });
   edgesDS.update(edgeUpdates);
 
-  const color = groupColor(groupName);
+  const groupList = [...selectedGroupNames].sort();
   const memberItems = allNodes
-    .filter(n => n.groupName === groupName)
-    .sort((a, b) => (a.label || '').localeCompare(b.label || ''))
-    .map(n => `<li>${n.label}</li>`)
-    .join('');
+    .filter(n => selectedGroupNames.has(n.groupName))
+    .sort((a, b) => (a.label || '').localeCompare(b.label || ''));
+  const chipsHtml = groupList.map(g => {
+    const c = groupColor(g) || '#94a3b8';
+    return `<span style="background:${c}22;color:${c};border:1px solid ${c}66;padding:2px 8px;border-radius:10px;font-size:11px;margin-right:4px;">${g}</span>`;
+  }).join('');
   document.getElementById('impact').innerHTML = `
-    <div><b style="color:${color}">${groupName}</b> &middot; ${members.size} service(s)</div>
-    <div style="margin-top:8px;color:${color};font-weight:600;">Members</div>
-    <ul>${memberItems}</ul>
+    <div><b>${groupList.length} group${groupList.length === 1 ? '' : 's'} selected</b> &middot; ${members.size} service(s)</div>
+    <div style="margin-top:8px;">${chipsHtml}</div>
+    <div style="margin-top:8px;color:var(--text-muted);font-weight:600;font-size:11px;">Members</div>
+    <ul>${memberItems.map(n => `<li>${n.label}</li>`).join('')}</ul>
+    <div style="margin-top:6px;font-size:11px;color:var(--text-muted);">Tip: Ctrl/Cmd-click another group chip to add it.</div>
   `;
 }
 
@@ -952,6 +963,10 @@ async function selectService(svcId, btn) {
   });
   edgesDS.update(edgeUpdates);
 
+  const poolsDirect = new Set([...directSet, ...viaTargets, ...impactDirectSet]);
+  const poolsTrans  = new Set([...transSet, ...impactTransSet]);
+  colorPoolsForImpact(poolsDirect, poolsTrans);
+
   const list = (ids) => ids.length
     ? '<ul>' + ids.map(i => `<li>${i}</li>`).join('') + '</ul>'
     : '<em style="color:#64748b">none</em>';
@@ -981,6 +996,7 @@ function resetView() {
   document.getElementById('impact').innerHTML = 'Select a service or group.';
   if (nodesDS) nodesDS.update(allNodes.map(n => ({ id: n.id, color: nodeColor(n) })));
   if (edgesDS) edgesDS.update(allEdges.map(e => ({ id: e.id, color: e.color, width: e.route ? 2 : 1 })));
+  colorPoolsForImpact(new Set(), new Set());
 }
 
 function applyTheme(theme) {
@@ -1000,11 +1016,144 @@ function applyTheme(theme) {
 document.getElementById('reset').onclick = resetView;
 document.getElementById('theme-toggle').onclick = () => applyTheme(document.documentElement.dataset.theme === 'light' ? 'dark' : 'light');
 document.getElementById('recluster').onclick = () => clusterPools();
+document.getElementById('sidebar-toggle').onclick = () => {
+  const app = document.getElementById('app');
+  const btn = document.getElementById('sidebar-toggle');
+  const collapsed = app.classList.toggle('sidebar-collapsed');
+  btn.textContent = collapsed ? '▶' : '◀';
+  btn.title = collapsed ? 'Show sidebar' : 'Hide sidebar';
+  setTimeout(() => {
+    if (network) network.redraw();
+    if (matrixData && document.getElementById('matrix-wrap').offsetWidth > 0) sizeMatrix();
+  }, 250);
+};
 document.getElementById('upload-yaml').onclick = () => document.getElementById('file-input').click();
 document.getElementById('file-input').onchange = (ev) => {
   const file = ev.target.files && ev.target.files[0];
   if (file) uploadYaml(file);
   ev.target.value = '';
+};
+
+function validateServiceGraph(text) {
+  let doc;
+  try {
+    doc = jsyaml.load(text);
+  } catch (e) {
+    let msg = e.message || String(e);
+    if (e.mark) msg += '\n  at line ' + (e.mark.line + 1) + ', column ' + (e.mark.column + 1);
+    return { ok: false, error: msg };
+  }
+  if (doc == null) return { ok: false, error: 'Empty YAML.' };
+  if (typeof doc !== 'object' || Array.isArray(doc)) return { ok: false, error: 'Top-level must be a mapping with a "services:" array.' };
+  if (!Array.isArray(doc.services)) return { ok: false, error: '"services" must be an array.' };
+  const ids = new Set();
+  for (let i = 0; i < doc.services.length; i++) {
+    const s = doc.services[i];
+    const ctx = 'services[' + i + ']';
+    if (typeof s !== 'object' || s == null || Array.isArray(s)) return { ok: false, error: ctx + ': must be an object.' };
+    if (typeof s.id !== 'string' || !s.id.trim()) return { ok: false, error: ctx + ': "id" is required (non-empty string).' };
+    if (ids.has(s.id)) return { ok: false, error: ctx + ': duplicate id "' + s.id + '".' };
+    ids.add(s.id);
+    if (s.dependsOn != null) {
+      if (!Array.isArray(s.dependsOn)) return { ok: false, error: ctx + '.dependsOn: must be an array.' };
+      for (let j = 0; j < s.dependsOn.length; j++) {
+        const d = s.dependsOn[j];
+        const dctx = ctx + '.dependsOn[' + j + ']';
+        if (typeof d === 'string') continue;
+        if (typeof d !== 'object' || d == null || Array.isArray(d)) return { ok: false, error: dctx + ': must be a string or {target, via}.' };
+        if (typeof d.target !== 'string' || !d.target.trim()) return { ok: false, error: dctx + ': "target" is required.' };
+        if (d.via != null && typeof d.via !== 'string') return { ok: false, error: dctx + ': "via" must be a string.' };
+      }
+    }
+  }
+  return { ok: true, services: doc.services.length };
+}
+
+let lintTimer = null;
+function lintYaml() {
+  const ta = document.getElementById('yaml-text');
+  const status = document.getElementById('yaml-lint');
+  const save = document.getElementById('yaml-save');
+  const result = validateServiceGraph(ta.value);
+  if (result.ok) {
+    status.className = 'lint-status ok';
+    status.textContent = 'Valid — ' + result.services + ' service(s).';
+    save.disabled = false;
+  } else {
+    status.className = 'lint-status err';
+    status.textContent = result.error;
+    save.disabled = true;
+  }
+}
+
+function closeYamlPanel() {
+  const app = document.getElementById('app');
+  app.classList.remove('yaml-open');
+  app.classList.remove('yaml-min');
+  setTimeout(() => { if (network) network.redraw(); }, 250);
+}
+
+document.getElementById('edit-yaml').onclick = async () => {
+  const app = document.getElementById('app');
+  const wasOpen = app.classList.contains('yaml-open');
+  app.classList.add('yaml-open');
+  app.classList.remove('yaml-min');
+  const yamlBtn = document.getElementById('yaml-toggle');
+  yamlBtn.textContent = '▶';
+  yamlBtn.title = 'Hide YAML panel';
+
+  const ta = document.getElementById('yaml-text');
+  if (!wasOpen) {
+    const status = document.getElementById('yaml-lint');
+    try {
+      const res = await fetch('/api/yaml');
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      ta.value = await res.text();
+    } catch (e) {
+      ta.value = 'services: []\n';
+      status.className = 'lint-status err';
+      status.textContent = 'Could not fetch current YAML: ' + e.message + ' — starting blank.';
+    }
+    lintYaml();
+  }
+  setTimeout(() => { ta.focus(); if (network) network.redraw(); }, 250);
+};
+document.getElementById('yaml-text').oninput = () => {
+  if (lintTimer) clearTimeout(lintTimer);
+  lintTimer = setTimeout(lintYaml, 200);
+};
+document.getElementById('yaml-cancel').onclick = closeYamlPanel;
+document.getElementById('yaml-close').onclick = closeYamlPanel;
+document.getElementById('yaml-toggle').onclick = () => {
+  const app = document.getElementById('app');
+  const minimized = app.classList.toggle('yaml-min');
+  const btn = document.getElementById('yaml-toggle');
+  btn.textContent = minimized ? '◀' : '▶';
+  btn.title = minimized ? 'Show YAML panel' : 'Hide YAML panel';
+  setTimeout(() => { if (network) network.redraw(); }, 250);
+};
+document.getElementById('yaml-save').onclick = async () => {
+  const text = document.getElementById('yaml-text').value;
+  const status = document.getElementById('yaml-lint');
+  const save = document.getElementById('yaml-save');
+  save.disabled = true;
+  try {
+    const res = await fetch('/api/graph', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-yaml' },
+      body: text,
+    });
+    if (!res.ok) {
+      const msg = await res.text();
+      throw new Error('HTTP ' + res.status + ': ' + msg.slice(0, 200));
+    }
+    closeYamlPanel();
+    await load();
+  } catch (e) {
+    status.className = 'lint-status err';
+    status.textContent = 'Save failed: ' + e.message;
+    save.disabled = false;
+  }
 };
 document.querySelectorAll('#view-toggle button').forEach(b => b.onclick = () => setView(b.dataset.view));
 window.addEventListener('resize', () => { if (document.getElementById('matrix-wrap').offsetWidth > 0) sizeMatrix(); });
