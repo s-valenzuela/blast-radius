@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Blast Radius</title>
+  <script src="vendor/vis-network.min.js"></script>
+  <script src="vendor/js-yaml.min.js"></script>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<div id="app">
+  <button id="sidebar-toggle" title="Hide sidebar">◀</button>
+  <aside>
+    <h1>Blast Radius <button id="reset">clear</button><button id="theme-toggle" title="Toggle theme">Light</button><button id="upload-yaml" title="Load a YAML file">Load YAML</button></h1>
+    <div style="font-size:11px;color:#94a3b8;">Click a service to see what it depends on and what depends on it.</div>
+    <input type="file" id="file-input" accept=".yml,.yaml" hidden>
+    <div id="upload-status" style="font-size:11px;margin-top:6px;display:none;"></div>
+
+    <h2>Services</h2>
+    <div id="services"></div>
+
+    <h2>Groups</h2>
+    <div id="groups" style="display:flex;flex-wrap:wrap;gap:6px;font-size:11px;"></div>
+
+    <h2>LB pools</h2>
+    <div id="lb-pools" style="display:flex;flex-wrap:wrap;gap:6px;font-size:11px;"></div>
+
+    <h2>Selection</h2>
+    <div id="impact">Select a service.</div>
+  </aside>
+  <main>
+    <div id="main-toolbar">
+      <button id="edit-yaml" title="Edit the current YAML">Edit YAML</button>
+      <div id="view-toggle">
+        <button data-view="graph" class="active">Graph</button>
+        <button data-view="matrix">Matrix</button>
+      </div>
+    </div>
+    <div id="matrix-wrap" style="display:none;"></div>
+    <div id="network"></div>
+    <div id="legend">
+      <div class="row"><span class="swatch" style="background:var(--node-service-bg);border:1px solid var(--node-service-border);"></span>Service (no group)</div>
+      <div class="row"><span class="swatch hex" style="background:var(--node-gateway-bg);border:1px solid var(--node-gateway-border);"></span>Gateway (no group)</div>
+      <div class="row"><span class="swatch" style="background:var(--node-db-bg);border:1px solid var(--node-db-border);border-radius:2px;"></span>Database (no group)</div>
+      <div class="row"><span class="swatch" style="background:#38bdf8;border:2px solid #38bdf8;"></span>Fill color = group</div>
+      <div class="row"><span class="swatch" style="background:#ef4444;"></span>Directly affected / dep</div>
+      <div class="row"><span class="swatch" style="background:#fb923c;"></span>Transitively affected</div>
+      <div class="row"><svg width="14" height="14" viewBox="0 0 100 100" style="flex-shrink:0;"><polygon points="50,5 95,38 78,92 22,92 5,38" fill="#0b1220" stroke="#94a3b8" stroke-width="8"/></svg>LB pool (double-click to expand)</div>
+      <button id="recluster" title="Re-collapse all LB pools">Re-cluster pools</button>
+    </div>
+  </main>
+  <section id="yaml-panel">
+    <div id="yaml-panel-header">
+      <h3>Edit YAML</h3>
+      <button id="yaml-close" title="Close panel">×</button>
+    </div>
+    <textarea id="yaml-text" spellcheck="false" wrap="off"></textarea>
+    <div id="yaml-lint" class="lint-status"></div>
+    <div class="panel-actions">
+      <button id="yaml-cancel">Cancel</button>
+      <button id="yaml-save" disabled>Save</button>
+    </div>
+  </section>
+  <button id="yaml-toggle" title="Hide YAML panel">▶</button>
+</div>
+
+<script src="model/parse.js"></script>
+<script src="model/impact.js"></script>
+<script src="model/shape.js"></script>
+<script src="model/yaml.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
