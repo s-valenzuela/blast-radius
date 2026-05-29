@@ -5,8 +5,8 @@ import yaml from 'js-yaml';
 import parse from './parse.js';
 import impact from './impact.js';
 
-// Load the same fixture the Java @SpringBootTest used.
-const raw = yaml.load(readFileSync(join(process.cwd(), 'src/main/resources/services.yml'), 'utf8'));
+// The default graph the app ships with, also used as the test fixture.
+const raw = yaml.load(readFileSync(join(process.cwd(), 'src/main/resources/static/services.yml'), 'utf8'));
 const model = parse.normalize(raw);
 
 describe('parse', () => {

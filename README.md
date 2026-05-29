@@ -1,47 +1,60 @@
-# cert-graph
+# blast-radius
 
-Visualize certificate dependencies across microservices. Spring Boot 3 + a single static page using [vis-network](https://visjs.github.io/vis-network/).
+Visualize service-dependency blast radius. A dependency-free static page using
+[vis-network](https://visjs.github.io/vis-network/) — no backend, no build step.
 
 ## What it does
 
-- You describe certificates and services in a YAML file (see `src/main/resources/certs.yml`).
-- The app builds a graph: **certificates → services** (which services use the cert) and **service → service** (runtime dependencies).
-- Click any certificate in the sidebar (or in the graph). The view highlights:
-  - **Directly affected** services (they hold the cert).
-  - **Transitively affected** services (they depend on something that breaks).
+- You describe services and their dependencies in a YAML file
+  (`src/main/resources/static/services.yml`).
+- The app builds a graph of **service → service** dependencies, including calls
+  **routed via a gateway**.
+- Click any service (sidebar or graph). The view highlights:
+  - what it **depends on** (direct + transitive), and
+  - what is **impacted if it goes down** (direct + transitive) — its blast radius.
+- A matrix view, load-balancer-pool clustering, and an in-browser YAML editor
+  (upload / edit / save) are also included.
 
 ## Run
 
+It's a static site — serve the `static/` directory with any static file server:
+
 ```bash
-./mvnw spring-boot:run
-# open http://localhost:8080
+cd src/main/resources/static
+python3 -m http.server 8090
+# open http://localhost:8090
 ```
+
+(Opening `index.html` directly via `file://` will not work — the browser blocks
+`fetch('services.yml')` under that scheme. Any HTTP server is enough.)
 
 ## YAML schema
 
 ```yaml
-certificates:
-  - id: edge-tls
-    name: "Edge TLS *.example.com"
-    issuer: "Let's Encrypt"
-    expiresOn: 2026-06-12
-
 services:
-  - id: gateway
-    name: "API Gateway"
-    team: platform
-    certs: [edge-tls, internal-ca]
-    dependsOn: []
+  - id: web-fe-01
+    name: "Web Frontend 01"
+    group: edge                 # optional, used for coloring/clustering
+    kind: service               # service (default) | gateway | database
+    loadBalancerPool: web-fe    # optional; services sharing a value cluster behind one LB
+    dependsOn:
+      - { target: cart-svc, via: api-gateway }   # routed through a gateway
+      - { target: session-store }                # direct dependency
+      - search-svc                               # shorthand for { target: search-svc }
 ```
 
-Point the app at a different file with `--certgraph.source=file:/path/to/my.yml`,
-or `POST /api/graph` with `Content-Type: text/yaml` to swap the graph at runtime.
+Load a different graph at runtime with the **Upload** button, or paste/edit YAML
+in the **Edit YAML** panel — both parse entirely in the browser.
 
-## API
+## Develop
 
-| Method | Path | Description |
-|--------|------|-------------|
-| GET    | `/api/graph`           | nodes + edges for the UI |
-| GET    | `/api/certs`           | certificates with days-to-expiry |
-| GET    | `/api/impact/{certId}` | direct + transitive impact for one cert |
-| POST   | `/api/graph`           | replace the in-memory graph with new YAML |
+Logic lives in small ES-era modules under `static/model/` (`parse`, `impact`,
+`shape`, `yaml`), loaded as plain `<script>`s that expose a `window.BR` namespace
+and also work as Node modules for tests.
+
+```bash
+npm install        # one-time: vitest, js-yaml, typescript (dev only)
+npm test           # run the vitest suite
+npm run test:watch # re-run on change
+npm run typecheck  # tsc --noEmit over static/model (// @ts-check)
+```

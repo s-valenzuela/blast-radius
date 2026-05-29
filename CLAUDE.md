@@ -5,40 +5,67 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Commands
 
 ```bash
-# Run the app (serves on http://localhost:8080)
-./mvnw spring-boot:run
+# Run the app — it's a static site; serve the static/ directory
+cd src/main/resources/static && python3 -m http.server 8090
+# open http://localhost:8090
 
-# Run all tests
-./mvnw test
+# Tests (vitest)
+npm test                        # run all
+npm run test:watch              # watch mode
+npx vitest run impact           # a single test file by name
 
-# Run a single test method
-./mvnw test -Dtest=ImpactAnalyzerTest#eamPersonDownImpactsPvfButNotViceVersa
-
-# Build a fat JAR
-./mvnw package
-
-# Run with a custom YAML source
-./mvnw spring-boot:run -Dspring-boot.run.arguments=--blastradius.source=file:/path/to/my.yml
+# Type-check the model modules (tsc --noEmit, // @ts-check)
+npm run typecheck
 ```
+
+`npm install` once to get the dev dependencies (vitest, js-yaml, typescript).
 
 ## Architecture
 
-This is a Spring Boot 3 / Java 17 application. There is no database — the entire graph is held in memory and loaded from YAML at startup.
+This is a **frontend-only** static web app — no server, no database, no build
+step. Everything runs in the browser; logic is plain JS loaded via `<script>`.
 
-**Data flow:**
+**Layout** (all under `src/main/resources/static/`):
+- `index.html` — markup; loads vendored libs, the `model/` modules, then `app.js`.
+- `app.js` — all UI: vis-network rendering, the matrix view, LB-pool clustering,
+  selection/highlighting, and the YAML editor. Holds the in-memory graph in a
+  single `model` variable and derives every view from it via `BR.*`.
+- `model/` — the ported domain logic, each a small UMD module exposing a
+  `window.BR.<name>` namespace (and `module.exports` for Node tests):
+  - `parse.js`  — normalize raw YAML into the graph model (dependency shorthand,
+    field defaults). Mirrors the old `Dependency`/`ServiceNode` model.
+  - `impact.js` — forward/reverse BFS: what a service depends on and what depends
+    on it (direct + transitive). This is the "blast radius."
+  - `shape.js`  — builds the graph (nodes/edges), service list, single-service
+    detail, and matrix payloads consumed by `app.js`.
+  - `yaml.js`   — export the model back to YAML (a `dump` that takes the YAML lib
+    injected, so it works with the browser global and with Node).
+- `vendor/` — `vis-network.min.js`, `js-yaml.min.js` (no CDN).
+- `services.yml` — the default graph, fetched at startup and reused as the test fixture.
 
-1. `GraphLoader` reads `services.yml` (or whatever `blastradius.source` points to) into a `ServiceGraph` POJO on startup (`@PostConstruct`). The in-memory graph can be hot-swapped at runtime via `POST /api/graph`.
-2. `ImpactAnalyzer` takes the live graph from `GraphLoader` and performs forward- and reverse-BFS to compute what a service depends on and what depends on it (direct + transitive). This is the "blast radius" of a service.
-3. `GraphController` exposes `/api/*` REST endpoints. The graph endpoint (`GET /api/graph`) shapes nodes/edges for the vis-network frontend.
-4. `src/main/resources/static/index.html` is a single static page served by Spring; it calls the API and renders the graph with vis-network (loaded from CDN).
+**Data flow:** `app.js` `bootstrap()` fetches `services.yml`, parses it with
+`jsyaml` + `BR.parse.normalize` into `model`, then `load()` renders all views via
+`BR.shape.*`. Upload / Edit-YAML replace `model` and re-render. Nothing leaves the
+browser.
 
-**Key relationships in the YAML model:**
-- A `ServiceNode` has `id`, `name`, `group`, `kind` (default `service`, may be `gateway`), `loadBalancerPool` (optional; services sharing a string are grouped behind one LB), and `dependsOn` (list of `Dependency` entries).
-- A `Dependency` has `target` (required) and optional `via` (gateway service id) for routed calls.
-- Graph edges: `service → service` (depends), and for routed deps a `service → gateway` (depends) plus `gateway → target` (routes) pair.
+**YAML model:**
+- A service has `id`, `name`, `group`, `kind` (`service` default, may be `gateway`
+  or `database`), `loadBalancerPool` (optional; shared value clusters services
+  behind one LB), and `dependsOn`.
+- A dependency is `{ target, via? }` or a bare string (shorthand for `{ target }`);
+  `via` names a gateway for routed calls.
+- Graph edges: `service → service` (depends); a routed dep becomes a
+  `service → gateway` (depends) plus `gateway → target` (routes) pair.
 
-**Node ID prefix** used in the graph API response: `svc:<id>`. Load-balancer pool clusters in the frontend get a synthetic `pool:<name>` id.
+**Node ID prefix** in the graph payload: `svc:<id>`. LB-pool clusters in the
+frontend use a synthetic `pool:<name>` id.
 
-**Tests** are `@SpringBootTest` integration tests that load the bundled `services.yml` fixture and assert on impact analysis results.
+**Tests** are vitest specs in `model/*.test.js` that load `services.yml` and assert
+on the model functions. `app.js` is type-checked in-editor via `// @ts-check` but
+is not in the `npm run typecheck` gate (which covers the clean `model/` modules).
 
-**Historical note:** the parent directory may still be named `cert-graph/` — an earlier version of this project modeled certificate expiry impact. That layer has been removed; only service-dependency modeling remains. Renaming the directory itself is a separate manual step.
+**History:** this was originally a Spring Boot app (and before that, a certificate-
+expiry visualizer). The Java backend was removed once all logic was ported to
+`model/` and verified at parity against the old `/api/*` endpoints. The directory
+is still named `cert-graph/` and the app still lives under the Maven-style
+`src/main/resources/static/` path; both are historical and could be flattened.

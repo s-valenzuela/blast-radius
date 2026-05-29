@@ -5,7 +5,7 @@ import yaml from 'js-yaml';
 import parse from './parse.js';
 import shape from './shape.js';
 
-const raw = yaml.load(readFileSync(join(process.cwd(), 'src/main/resources/services.yml'), 'utf8'));
+const raw = yaml.load(readFileSync(join(process.cwd(), 'src/main/resources/static/services.yml'), 'utf8'));
 const model = parse.normalize(raw);
 
 describe('shape.graph', () => {
