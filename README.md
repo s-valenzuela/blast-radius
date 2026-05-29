@@ -5,8 +5,7 @@ Visualize service-dependency blast radius. A dependency-free static page using
 
 ## What it does
 
-- You describe services and their dependencies in a YAML file
-  (`src/main/resources/static/services.yml`).
+- You describe services and their dependencies in a YAML file (`services.yml`).
 - The app builds a graph of **service → service** dependencies, including calls
   **routed via a gateway**.
 - Click any service (sidebar or graph). The view highlights:
@@ -17,10 +16,9 @@ Visualize service-dependency blast radius. A dependency-free static page using
 
 ## Run
 
-It's a static site — serve the `static/` directory with any static file server:
+It's a static site — serve the repo with any static file server:
 
 ```bash
-cd src/main/resources/static
 python3 -m http.server 8090
 # open http://localhost:8090
 ```
@@ -48,13 +46,13 @@ in the **Edit YAML** panel — both parse entirely in the browser.
 
 ## Develop
 
-Logic lives in small ES-era modules under `static/model/` (`parse`, `impact`,
-`shape`, `yaml`), loaded as plain `<script>`s that expose a `window.BR` namespace
-and also work as Node modules for tests.
+Logic lives in small modules under `model/` (`parse`, `impact`, `shape`, `yaml`),
+loaded as plain `<script>`s that expose a `window.BR` namespace and also work as
+Node modules for tests.
 
 ```bash
 npm install        # one-time: vitest, js-yaml, typescript (dev only)
 npm test           # run the vitest suite
 npm run test:watch # re-run on change
-npm run typecheck  # tsc --noEmit over static/model (// @ts-check)
+npm run typecheck  # tsc --noEmit over model/ (// @ts-check)
 ```

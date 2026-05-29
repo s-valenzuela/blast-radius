@@ -5,8 +5,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Commands
 
 ```bash
-# Run the app — it's a static site; serve the static/ directory
-cd src/main/resources/static && python3 -m http.server 8090
+# Run the app — it's a static site; serve the repo root
+python3 -m http.server 8090
 # open http://localhost:8090
 
 # Tests (vitest)
@@ -25,7 +25,7 @@ npm run typecheck
 This is a **frontend-only** static web app — no server, no database, no build
 step. Everything runs in the browser; logic is plain JS loaded via `<script>`.
 
-**Layout** (all under `src/main/resources/static/`):
+**Layout** (everything lives at the repo root):
 - `index.html` — markup; loads vendored libs, the `model/` modules, then `app.js`.
 - `app.js` — all UI: vis-network rendering, the matrix view, LB-pool clustering,
   selection/highlighting, and the YAML editor. Holds the in-memory graph in a
@@ -66,6 +66,6 @@ is not in the `npm run typecheck` gate (which covers the clean `model/` modules)
 
 **History:** this was originally a Spring Boot app (and before that, a certificate-
 expiry visualizer). The Java backend was removed once all logic was ported to
-`model/` and verified at parity against the old `/api/*` endpoints. The directory
-is still named `cert-graph/` and the app still lives under the Maven-style
-`src/main/resources/static/` path; both are historical and could be flattened.
+`model/` and verified at parity against the old `/api/*` endpoints, and the static
+files were flattened from `src/main/resources/static/` to the repo root. The
+repository directory is still named `cert-graph/` for historical reasons.

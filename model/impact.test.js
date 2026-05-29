@@ -6,7 +6,7 @@ import parse from './parse.js';
 import impact from './impact.js';
 
 // The default graph the app ships with, also used as the test fixture.
-const raw = yaml.load(readFileSync(join(process.cwd(), 'src/main/resources/static/services.yml'), 'utf8'));
+const raw = yaml.load(readFileSync(join(process.cwd(), 'services.yml'), 'utf8'));
 const model = parse.normalize(raw);
 
 describe('parse', () => {
