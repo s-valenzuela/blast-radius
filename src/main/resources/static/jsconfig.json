@@ -10,6 +10,6 @@
     "noImplicitAny": false,
     "skipLibCheck": true
   },
-  "include": ["app.js", "globals.d.ts"],
-  "exclude": ["vendor"]
+  "include": ["model/**/*.js", "globals.d.ts"],
+  "exclude": ["vendor", "node_modules", "**/*.test.js"]
 }
