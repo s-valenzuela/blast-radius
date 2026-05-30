@@ -1,0 +1,19 @@
+Blast Radius
+Copyright 2026 Valenzuela Consulting AB
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+See the LICENSE file for the full license text, or obtain a copy at
+http://www.apache.org/licenses/LICENSE-2.0
+
+------------------------------------------------------------------------
+Third-party components bundled in vendor/ (each under its own license):
+
+  vis-network  https://github.com/visjs/vis-network
+               dual licensed under Apache-2.0 OR MIT
+               (c) 2011-2017 Almende B.V.; (c) 2017-2019 visjs contributors
+
+  js-yaml      https://github.com/nodeca/js-yaml
+               MIT License
+               (c) 2011-2015 Vitaly Puzrin
+</content>
