@@ -11,8 +11,8 @@
 <div id="app">
   <button id="sidebar-toggle" title="Hide sidebar">◀</button>
   <aside>
-    <h1>Blast Radius <button id="reset">clear</button><button id="theme-toggle" title="Toggle theme">Light</button><button id="upload-yaml" title="Load a YAML file">Load YAML</button></h1>
-    <div style="font-size:11px;color:#94a3b8;">Click a service to see what it depends on and what depends on it.</div>
+    <h1>Blast Radius <button id="reset">clear</button><button id="theme-toggle" title="Toggle theme">Light</button><button id="about-open" title="About this app">About</button></h1>
+    <div style="font-size:11px;color:var(--text-muted);">Click a service to see what it depends on and what depends on it.</div>
     <input type="file" id="file-input" accept=".yml,.yaml" hidden>
     <div id="upload-status" style="font-size:11px;margin-top:6px;display:none;"></div>
 
@@ -30,7 +30,15 @@
   </aside>
   <main>
     <div id="main-toolbar">
-      <button id="edit-yaml" title="Edit the current YAML">Edit YAML</button>
+      <div id="yaml-menu">
+        <button id="yaml-menu-btn" title="Import, edit, or export YAML">YAML ▾</button>
+        <div id="yaml-menu-list" hidden>
+          <button id="edit-yaml" title="Edit the current YAML">Edit…</button>
+          <button id="upload-yaml" title="Load a YAML file">Load from file…</button>
+          <button id="download-yaml" title="Download the current YAML">Download</button>
+          <button id="revert-yaml" title="Discard saved changes and reload the bundled default">Revert to default</button>
+        </div>
+      </div>
       <div id="view-toggle">
         <button data-view="graph" class="active">Graph</button>
         <button data-view="matrix">Matrix</button>
@@ -62,6 +70,39 @@
     </div>
   </section>
   <button id="yaml-toggle" title="Hide YAML panel">▶</button>
+
+  <div id="about-overlay" hidden>
+    <div id="about-dialog" role="dialog" aria-modal="true" aria-labelledby="about-title">
+      <button id="about-close" title="Close">×</button>
+      <h2 id="about-title">Blast Radius</h2>
+      <p>An interactive map of your services and their dependencies. Click any
+        service to see its <em>blast radius</em>: what it depends on, and what
+        would break if it went down — both directly and transitively.</p>
+
+      <h3>Using it</h3>
+      <ul>
+        <li><b>Click a service</b> (in the list or the graph) to highlight its
+          dependencies and everything impacted if it fails.</li>
+        <li><b>Graph / Matrix</b> toggle to switch between the network view and a
+          dependency matrix.</li>
+        <li><b>LB pools</b> collapse services behind a shared load balancer;
+          double-click a pool to expand it.</li>
+        <li><b>YAML menu</b> — edit the graph inline, load a <code>.yml</code>
+          file, or download the current one.</li>
+        <li>Your graph and node layout are saved in your browser, so a reload
+          keeps your changes. <b>Revert to default</b> clears them.</li>
+      </ul>
+
+      <h3>Private &amp; free</h3>
+      <p>Everything runs in your browser — nothing is ever uploaded to a server.
+        It's free and open source, released under the Apache&nbsp;2.0 license.</p>
+
+      <p><a id="about-github" href="https://github.com/s-valenzuela/blast-radius"
+        target="_blank" rel="noopener">View the source on GitHub →</a></p>
+
+      <p class="about-copyright">© 2026 Valenzuela Consulting AB · Apache 2.0</p>
+    </div>
+  </div>
 </div>
 
 <script src="model/parse.js"></script>
