@@ -34,6 +34,37 @@ describe('shape.graph', () => {
   });
 });
 
+describe('shape.graph with a pool-name dependency target', () => {
+  const poolModel = parse.normalize({
+    services: [
+      { id: 'checkout', dependsOn: [{ target: 'payment-gw' }] },
+      { id: 'payment-gw-01', loadBalancerPool: 'payment-gw', dependsOn: [] },
+      { id: 'payment-gw-02', loadBalancerPool: 'payment-gw', dependsOn: [] },
+    ],
+  });
+  const { nodes, edges } = shape.graph(poolModel);
+
+  it('adds one synthetic pool node and links the caller to it', () => {
+    const pool = nodes.find((n) => n.id === 'pool:payment-gw');
+    expect(pool).toMatchObject({ kind: 'pool', label: 'payment-gw' });
+    expect(edges).toContainEqual(
+      expect.objectContaining({ from: 'svc:checkout', to: 'pool:payment-gw', type: 'depends' }),
+    );
+  });
+
+  it('fans the pool node out to every member', () => {
+    const members = edges.filter((e) => e.from === 'pool:payment-gw' && e.type === 'pool').map((e) => e.to);
+    expect(members).toEqual(expect.arrayContaining(['svc:payment-gw-01', 'svc:payment-gw-02']));
+  });
+
+  it('expands a pool target to member cells in the matrix', () => {
+    const { deps } = shape.matrix(poolModel);
+    const fromCheckout = deps.filter((d) => d.from === 'checkout').map((d) => d.to);
+    expect(fromCheckout).toEqual(expect.arrayContaining(['payment-gw-01', 'payment-gw-02']));
+    expect(fromCheckout).not.toContain('payment-gw');
+  });
+});
+
 describe('shape.serviceDetail', () => {
   it('matches the analyzer for web-fe-01', () => {
     const d = shape.serviceDetail(model, 'web-fe-01');

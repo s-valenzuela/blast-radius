@@ -35,7 +35,12 @@ step. Everything runs in the browser; logic is plain JS loaded via `<script>`.
   - `parse.js`  — normalize raw YAML into the graph model (dependency shorthand,
     field defaults). Mirrors the old `Dependency`/`ServiceNode` model.
   - `impact.js` — forward/reverse BFS: what a service depends on and what depends
-    on it (direct + transitive). This is the "blast radius."
+    on it (direct + transitive). This is the "blast radius." LB pools are
+    **semantic** here: the closure runs in "unit space" where each
+    `loadBalancerPool` collapses to one logical node (members are
+    interchangeable), then expands back to concrete ids. So depending on any
+    pool member — or on the pool name as a `target` — means depending on the
+    pool, and all members of a pool share the same blast radius.
   - `shape.js`  — builds the graph (nodes/edges), service list, single-service
     detail, and matrix payloads consumed by `app.js`.
   - `yaml.js`   — export the model back to YAML (a `dump` that takes the YAML lib
@@ -55,10 +60,15 @@ browser.
 - A dependency is `{ target, via? }` or a bare string (shorthand for `{ target }`);
   `via` names a gateway for routed calls.
 - Graph edges: `service → service` (depends); a routed dep becomes a
-  `service → gateway` (depends) plus `gateway → target` (routes) pair.
+  `service → gateway` (depends) plus `gateway → target` (routes) pair. A dep
+  whose `target` (or `via`) names an LB pool points instead at a synthetic
+  `pool:<name>` node, which fans out to its members with `pool`-type edges.
 
-**Node ID prefix** in the graph payload: `svc:<id>`. LB-pool clusters in the
-frontend use a synthetic `pool:<name>` id.
+**Node IDs** in the graph payload: services are `svc:<id>`; a pool referenced as
+a dependency target becomes a synthetic `pool:<name>` node (kind `pool`). Note
+the *frontend* member-clustering (collapsing a pool's members into one glyph) is
+a separate visual feature that uses an `lb:<name>` cluster id, built in `app.js`
+— don't confuse it with the `pool:<name>` target node from `shape.graph`.
 
 **Tests** are vitest specs in `model/*.test.js` that load `services.yml` and assert
 on the model functions. `app.js` is type-checked in-editor via `// @ts-check` but

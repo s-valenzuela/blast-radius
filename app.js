@@ -8,6 +8,7 @@ const COLOR_THEMES = {
     service:    { background: '#1e293b', border: '#38bdf8' },
     gateway:    { background: '#312e81', border: '#a78bfa' },
     database:   { background: '#0c4a4a', border: '#94a3b8' },
+    pool:       { background: '#0b1220', border: '#94a3b8' },
     direct:     { background: '#ef4444', border: '#7f1d1d' },
     trans:      { background: '#fb923c', border: '#7c2d12' },
     gatewayHit: { background: '#7c3aed', border: '#a78bfa' },
@@ -17,6 +18,7 @@ const COLOR_THEMES = {
     service:    { background: '#e0f2fe', border: '#0284c7' },
     gateway:    { background: '#ede9fe', border: '#8b5cf6' },
     database:   { background: '#ccfbf1', border: '#64748b' },
+    pool:       { background: '#e2e8f0', border: '#64748b' },
     direct:     { background: '#ef4444', border: '#7f1d1d' },
     trans:      { background: '#fb923c', border: '#7c2d12' },
     gatewayHit: { background: '#7c3aed', border: '#a78bfa' },
@@ -62,9 +64,11 @@ function nodeFontColor() {
 }
 
 const ROUTE_PALETTE = ['#22d3ee', '#a78bfa', '#f472b6', '#34d399', '#fbbf24', '#fb7185', '#60a5fa'];
-function routeColor(routeId) {
+// Routed edges are colored by their gateway, so both legs of a call (caller→gw,
+// gw→target) and every route sharing a gateway get one consistent color.
+function gatewayColor(gatewayId) {
   let h = 0;
-  for (let i = 0; i < routeId.length; i++) h = (h * 31 + routeId.charCodeAt(i)) & 0xffff;
+  for (let i = 0; i < gatewayId.length; i++) h = (h * 31 + gatewayId.charCodeAt(i)) & 0xffff;
   return ROUTE_PALETTE[h % ROUTE_PALETTE.length];
 }
 
@@ -545,6 +549,7 @@ function sizeMatrix() {
 function nodeColor(n) {
   const base = n.kind === 'gateway' ? COLORS.gateway
              : n.kind === 'database' ? COLORS.database
+             : n.kind === 'pool' ? COLORS.pool
              : COLORS.service;
   const gc = groupColor(n.groupName);
   if (!gc) return base;
@@ -555,12 +560,14 @@ function nodeColor(n) {
 function nodeShape(n) {
   if (n.kind === 'gateway') return 'hexagon';
   if (n.kind === 'database') return 'database';
+  if (n.kind === 'pool') return 'diamond';
   return 'dot';
 }
 
 function nodeSize(n) {
   if (n.kind === 'gateway') return 26;
   if (n.kind === 'database') return 14;
+  if (n.kind === 'pool') return 22;
   return 18;
 }
 
@@ -658,8 +665,10 @@ function renderGraph(graph) {
     let color, dashes = false, width = 1;
     if (e.type === 'uses') {
       color = '#b45309'; dashes = true;
+    } else if (e.type === 'pool') {
+      color = '#64748b'; dashes = true;  // LB fan-out to pool members
     } else if (e.route) {
-      color = routeColor(e.route); width = 2;
+      color = gatewayColor(e.gateway || e.to); width = 2;
     } else {
       color = '#475569';
     }
@@ -969,14 +978,18 @@ function selectService(svcId, btn) {
   setActive(btn);
 
   const r = BR.shape.serviceDetail(model, svcId);
+  // A dependency id may name an LB pool; if a synthetic pool node exists for it,
+  // map to that, otherwise to the service node.
+  const poolNodeIds = new Set(allNodes.filter(n => n.kind === 'pool').map(n => n.id));
+  const toNodeId = (id) => poolNodeIds.has('pool:' + id) ? 'pool:' + id : 'svc:' + id;
   const self = 'svc:' + svcId;
-  const directSet = new Set(r.direct.map(id => 'svc:' + id));
+  const directSet = new Set(r.direct.map(toNodeId));
   const viaTargets = new Set();
   const viaGateways = new Set();
-  for (const v of r.via) { viaTargets.add('svc:' + v.target); viaGateways.add('svc:' + v.via); }
-  const transSet = new Set(r.transitive.map(id => 'svc:' + id));
-  const impactDirectSet = new Set((r.impactedDirect || []).map(id => 'svc:' + id));
-  const impactTransSet = new Set((r.impactedTransitive || []).map(id => 'svc:' + id));
+  for (const v of r.via) { viaTargets.add(toNodeId(v.target)); viaGateways.add(toNodeId(v.via)); }
+  const transSet = new Set(r.transitive.map(toNodeId));
+  const impactDirectSet = new Set((r.impactedDirect || []).map(toNodeId));
+  const impactTransSet = new Set((r.impactedTransitive || []).map(toNodeId));
 
   const nodeUpdates = allNodes.map(n => {
     let color = COLORS.dim;
@@ -996,6 +1009,7 @@ function selectService(svcId, btn) {
     let dim = true;
     if (e.from === self) dim = false;
     if (e.etype === 'routes' && viaGateways.has(e.from) && viaTargets.has(e.to)) dim = false;
+    if (e.etype === 'pool' && (directSet.has(e.from) || transSet.has(e.from))) dim = false;
     if (e.to === self && impactDirectSet.has(e.from)) dim = false;
     const base = e.color.color;
     return { id: e.id, color: { color: dim ? '#1f2937' : base, highlight: base }, width: dim ? 1 : 2 };

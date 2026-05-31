@@ -58,6 +58,25 @@ describe('impact.analyzeService', () => {
     expect(ff.impactedTransitive).toEqual(expect.arrayContaining(['notification-svc']));
   });
 
+  it('treats LB-pool members as one unit: instances share a blast radius', () => {
+    const a = impact.analyzeService(model, 'payment-gw-01');
+    const b = impact.analyzeService(model, 'payment-gw-02');
+    const sort = (xs) => [...xs].sort();
+    // checkout-svc pins to payment-gw-01 in the YAML, but both instances are in
+    // the payment-gw pool, so taking either down impacts the same services.
+    expect(a.impactedDirect).toContain('checkout-svc');
+    expect(b.impactedDirect).toContain('checkout-svc');
+    expect(sort(a.impactedDirect)).toEqual(sort(b.impactedDirect));
+    expect(sort(a.impactedTransitive)).toEqual(sort(b.impactedTransitive));
+  });
+
+  it('depending on a pooled member pulls in its pool siblings transitively', () => {
+    // checkout declares payment-gw-01; payment-gw-02 (same pool) comes along.
+    const co = impact.analyzeService(model, 'checkout-svc');
+    expect(co.direct).toContain('payment-gw-01');
+    expect(co.transitive).toContain('payment-gw-02');
+  });
+
   it('returns an empty result for an unknown service', () => {
     const d = impact.analyzeService(model, 'does-not-exist');
     expect(d).toEqual({

@@ -26,42 +26,99 @@
    * }} ServiceDependencies
    */
 
-  /**
-   * @param {ServiceGraph} g
-   * @returns {Map<string, string[]>}
-   */
-  function forwardMap(g) {
-    const forward = new Map();
-    for (const s of g.services) {
-      const targets = [];
-      for (const dep of s.dependsOn) {
-        if (dep.target != null) targets.push(dep.target);
-        if (dep.via != null) targets.push(dep.via);
-      }
-      if (s.id != null) forward.set(s.id, targets);
-    }
-    return forward;
-  }
+  // --- Load-balancer pools as logical units ---------------------------------
+  // A pool is treated as a single node in the dependency graph: every member is
+  // interchangeable, so depending on one member (or on the pool name) means
+  // depending on the pool, and the pool is the unit whose blast radius we trace.
+  // The closure runs in "unit space" (pool name, or service id when unpooled)
+  // and is expanded back to concrete service ids in the output.
 
   /**
    * @param {ServiceGraph} g
+   * @returns {{ memberOf: Map<string,string>, members: Map<string,string[]> }}
+   */
+  function poolIndex(g) {
+    const memberOf = new Map();
+    const members = new Map();
+    for (const s of g.services) {
+      if (s.id == null) continue;
+      const p = s.loadBalancerPool;
+      if (p == null || p === '') continue;
+      memberOf.set(s.id, p);
+      if (!members.has(p)) members.set(p, []);
+      members.get(p).push(s.id);
+    }
+    return { memberOf, members };
+  }
+
+  /** The logical unit a service id belongs to: its pool, or itself. */
+  function unitOf(id, idx) { return idx.memberOf.get(id) || id; }
+
+  /**
+   * The unit a dependency target refers to: a pool name stays the pool, a pooled
+   * member collapses to its pool, anything else is itself.
+   */
+  function targetUnit(t, idx) {
+    if (idx.members.has(t)) return t;
+    return idx.memberOf.get(t) || t;
+  }
+
+  /** Concrete service ids a unit expands to (pool members, or the id itself). */
+  function expandUnit(u, idx) {
+    return idx.members.has(u) ? idx.members.get(u).slice() : [u];
+  }
+
+  /**
+   * Forward adjacency in unit space: unit -> units it depends on.
+   * @param {ServiceGraph} g
+   * @param {{ memberOf: Map<string,string>, members: Map<string,string[]> }} [idx]
    * @returns {Map<string, string[]>}
    */
-  function reverseMap(g) {
+  function forwardMap(g, idx) {
+    idx = idx || poolIndex(g);
+    /** @type {Map<string, Set<string>>} */
+    const forward = new Map();
+    for (const s of g.services) {
+      if (s.id == null) continue;
+      const u = unitOf(s.id, idx);
+      let set = forward.get(u);
+      if (!set) { set = new Set(); forward.set(u, set); }
+      for (const dep of s.dependsOn) {
+        if (dep.target != null) set.add(targetUnit(dep.target, idx));
+        if (dep.via != null) set.add(targetUnit(dep.via, idx));
+      }
+    }
+    const out = new Map();
+    for (const [k, set] of forward) out.set(k, [...set]);
+    return out;
+  }
+
+  /**
+   * Reverse adjacency in unit space: unit -> units that depend on it.
+   * @param {ServiceGraph} g
+   * @param {{ memberOf: Map<string,string>, members: Map<string,string[]> }} [idx]
+   * @returns {Map<string, string[]>}
+   */
+  function reverseMap(g, idx) {
+    idx = idx || poolIndex(g);
+    /** @type {Map<string, Set<string>>} */
     const reverse = new Map();
-    /** @param {string} key @param {string} from */
     const add = (key, from) => {
-      if (!reverse.has(key)) reverse.set(key, []);
-      reverse.get(key).push(from);
+      let set = reverse.get(key);
+      if (!set) { set = new Set(); reverse.set(key, set); }
+      set.add(from);
     };
     for (const s of g.services) {
       if (s.id == null) continue;
+      const u = unitOf(s.id, idx);
       for (const dep of s.dependsOn) {
-        if (dep.target != null) add(dep.target, s.id);
-        if (dep.via != null) add(dep.via, s.id);
+        if (dep.target != null) add(targetUnit(dep.target, idx), u);
+        if (dep.via != null) add(targetUnit(dep.via, idx), u);
       }
     }
-    return reverse;
+    const out = new Map();
+    for (const [k, set] of reverse) out.set(k, [...set]);
+    return out;
   }
 
   /**
@@ -78,6 +135,11 @@
       return { serviceId, direct: [], via: [], transitive: [], impactedDirect: [], impactedTransitive: [] };
     }
 
+    const idx = poolIndex(model);
+    const selfUnit = unitOf(serviceId, idx);
+    const selfMembers = new Set(expandUnit(selfUnit, idx));
+
+    // Declared deps of the clicked service (shown verbatim, per instance).
     /** @type {string[]} */
     const direct = [];
     /** @type {Dependency[]} */
@@ -90,44 +152,68 @@
       }
     }
 
-    const forward = forwardMap(model);
+    const forward = forwardMap(model, idx);
+    const reverse = reverseMap(model, idx);
 
-    // Forward closure. Seeds = direct deps + both legs of every routed dep.
-    const seeds = new Set(direct);
-    for (const d of via) {
-      if (d.target != null) seeds.add(d.target);
-      if (d.via != null) seeds.add(d.via);
+    // Forward closure over units. Seeds = the units this whole pool depends on
+    // (aggregated across members so every instance gives the same closure).
+    const seeds = new Set();
+    for (const s of model.services) {
+      if (s.id == null || unitOf(s.id, idx) !== selfUnit) continue;
+      for (const d of s.dependsOn) {
+        if (d.target != null) seeds.add(targetUnit(d.target, idx));
+        if (d.via != null) seeds.add(targetUnit(d.via, idx));
+      }
     }
     const visited = new Set(seeds);
+    visited.add(selfUnit);
     const stack = [...seeds];
-    /** @type {string[]} */
-    const transitive = [];
     while (stack.length) {
       const cur = /** @type {string} */ (stack.pop());
       for (const next of forward.get(cur) || []) {
-        if (!visited.has(next)) {
-          visited.add(next);
-          transitive.push(next);
-          stack.push(next);
-        }
+        if (!visited.has(next)) { visited.add(next); stack.push(next); }
+      }
+    }
+    // Transitive = members of every reached unit, minus self and anything already
+    // listed as a direct/routed dep (including the routed gateways).
+    const shown = new Set(selfMembers);
+    for (const t of direct) shown.add(t);
+    for (const d of via) { if (d.target != null) shown.add(d.target); if (d.via != null) shown.add(d.via); }
+    /** @type {string[]} */
+    const transitive = [];
+    const transSeen = new Set();
+    for (const u of visited) {
+      for (const m of expandUnit(u, idx)) {
+        if (!shown.has(m) && !transSeen.has(m)) { transSeen.add(m); transitive.push(m); }
       }
     }
 
-    // Reverse closure (blast radius).
-    const reverse = reverseMap(model);
-    const impactedDirect = [...new Set(reverse.get(serviceId) || [])];
-    const impactSeen = new Set(impactedDirect);
-    impactSeen.add(serviceId);
+    // Reverse closure over units (blast radius). Anything depending on a pool
+    // member depends on the pool, so all members share the same dependents.
+    /** @type {string[]} */
+    const impactedDirect = [];
+    const impDirectSeen = new Set();
+    for (const u of reverse.get(selfUnit) || []) {
+      for (const m of expandUnit(u, idx)) {
+        if (!selfMembers.has(m) && !impDirectSeen.has(m)) { impDirectSeen.add(m); impactedDirect.push(m); }
+      }
+    }
+    const impSeenUnits = new Set([selfUnit, ...(reverse.get(selfUnit) || [])]);
+    const impStack = [...(reverse.get(selfUnit) || [])];
     /** @type {string[]} */
     const impactedTransitive = [];
-    const impactStack = [...impactedDirect];
-    while (impactStack.length) {
-      const cur = /** @type {string} */ (impactStack.pop());
-      for (const upstream of reverse.get(cur) || []) {
-        if (!impactSeen.has(upstream)) {
-          impactSeen.add(upstream);
-          impactedTransitive.push(upstream);
-          impactStack.push(upstream);
+    const impTransSeen = new Set();
+    while (impStack.length) {
+      const cur = /** @type {string} */ (impStack.pop());
+      for (const up of reverse.get(cur) || []) {
+        if (impSeenUnits.has(up)) continue;
+        impSeenUnits.add(up);
+        impStack.push(up);
+        for (const m of expandUnit(up, idx)) {
+          if (!selfMembers.has(m) && !impDirectSeen.has(m) && !impTransSeen.has(m)) {
+            impTransSeen.add(m);
+            impactedTransitive.push(m);
+          }
         }
       }
     }
