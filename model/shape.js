@@ -24,6 +24,41 @@
     const nodes = [];
     const edges = [];
     let routeCounter = 0;
+
+    // A dependency may target an LB pool by name. Such a pool renders as one
+    // synthetic node ("the load balancer") that fans out to its members. Built
+    // lazily, so pools that are never targeted directly add no clutter.
+    const poolMembers = new Map();
+    for (const s of model.services) {
+      if (s.id == null) continue;
+      const p = s.loadBalancerPool;
+      if (p == null || p === '') continue;
+      if (!poolMembers.has(p)) poolMembers.set(p, []);
+      poolMembers.get(p).push(s.id);
+    }
+    const poolNodesAdded = new Set();
+    const ensurePoolNode = (name) => {
+      if (poolNodesAdded.has(name)) return;
+      poolNodesAdded.add(name);
+      nodes.push({
+        id: 'pool:' + name,
+        label: name,
+        group: 'service',
+        kind: 'pool',
+        groupName: '',
+        pool: '',
+      });
+      for (const m of poolMembers.get(name)) {
+        edges.push({ from: 'pool:' + name, to: PREFIX + m, type: 'pool' });
+      }
+    };
+    // The node a dependency leg points at: the synthetic pool node when it names
+    // an LB pool, otherwise the plain service node.
+    const targetId = (t) => {
+      if (poolMembers.has(t)) { ensurePoolNode(t); return 'pool:' + t; }
+      return PREFIX + t;
+    };
+
     for (const s of model.services) {
       nodes.push({
         id: PREFIX + s.id,
@@ -36,11 +71,12 @@
       for (const d of s.dependsOn) {
         if (d.target == null) continue;
         if (d.via == null) {
-          edges.push({ from: PREFIX + s.id, to: PREFIX + d.target, type: 'depends' });
+          edges.push({ from: PREFIX + s.id, to: targetId(d.target), type: 'depends' });
         } else {
           const routeId = 'r' + routeCounter++;
-          edges.push({ from: PREFIX + s.id, to: PREFIX + d.via, type: 'depends', route: routeId, viaTarget: d.target });
-          edges.push({ from: PREFIX + d.via, to: PREFIX + d.target, type: 'routes', route: routeId });
+          const viaId = targetId(d.via);
+          edges.push({ from: PREFIX + s.id, to: viaId, type: 'depends', route: routeId, viaTarget: d.target, gateway: viaId });
+          edges.push({ from: viaId, to: targetId(d.target), type: 'routes', route: routeId, gateway: viaId });
         }
       }
     }
@@ -104,11 +140,22 @@
       group: s.group == null ? '' : s.group,
       kind: s.kind == null ? 'service' : s.kind,
     }));
+    // The matrix is service x service with no pool column, so a dependency that
+    // targets an LB pool by name is expanded to one edge per member.
+    const poolMembers = new Map();
+    for (const s of model.services) {
+      if (s.id == null) continue;
+      const p = s.loadBalancerPool;
+      if (p == null || p === '') continue;
+      if (!poolMembers.has(p)) poolMembers.set(p, []);
+      poolMembers.get(p).push(s.id);
+    }
     const deps = [];
     for (const s of sorted) {
       for (const d of s.dependsOn) {
         if (d.target == null) continue;
-        deps.push({ from: s.id, to: d.target, via: d.via });
+        const targets = poolMembers.has(d.target) ? poolMembers.get(d.target) : [d.target];
+        for (const t of targets) deps.push({ from: s.id, to: t, via: d.via });
       }
     }
     return { services: svcOut, deps };

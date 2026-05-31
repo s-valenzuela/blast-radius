@@ -18,6 +18,8 @@
   --node-gateway-border: #a78bfa;
   --node-db-bg: #0c4a4a;
   --node-db-border: #94a3b8;
+  --node-pool-bg: #0b1220;
+  --node-pool-border: #94a3b8;
   --text-faint: #64748b;
   --accent-direct: #86efac;
   --accent-routed: #c4b5fd;
@@ -44,6 +46,8 @@
   --node-gateway-border: #8b5cf6;
   --node-db-bg: #ccfbf1;
   --node-db-border: #64748b;
+  --node-pool-bg: #e2e8f0;
+  --node-pool-border: #64748b;
   --text-faint: #64748b;
   --accent-direct: #15803d;
   --accent-routed: #7c3aed;
@@ -101,6 +105,7 @@ main { position: relative; min-height: 0; overflow: hidden; }
 #legend .row { display: flex; align-items: center; gap: 6px; margin: 2px 0; }
 #legend .swatch { width: 12px; height: 12px; border-radius: 50%; }
 #legend .swatch.hex { border-radius: 2px; transform: rotate(30deg); }
+#legend .swatch.dia { border-radius: 2px; transform: rotate(45deg); }
 #reset, #theme-toggle, #recluster, #about-open { font-size: 11px; background: var(--bg-cell-self); color: var(--text-soft); border: 0; padding: 4px 8px; border-radius: 4px; cursor: pointer; }
 #recluster { display: block; width: 100%; margin-top: 8px; }
 #recluster:hover { background: var(--bg-active); }
