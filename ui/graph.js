@@ -49,7 +49,7 @@ function renderServices(services) {
     header.innerHTML =
       `<span class="chev">▸</span>` +
       `<span class="dot" style="background:${dotColor};"></span>` +
-      `<span class="gname">${g}</span>` +
+      `<span class="gname">${esc(g)}</span>` +
       `<span class="count">${byGroup[g].length}</span>`;
     header.onclick = () => {
       const collapsed = groupRoot.classList.toggle('collapsed');
@@ -63,9 +63,9 @@ function renderServices(services) {
       btn.className = 'item';
       btn.dataset.id = s.id;
       btn.dataset.kind = 'service';
-      const kindBadge = s.kind && s.kind !== 'service' ? `<span class="badge kind">${s.kind}</span>` : '';
-      btn.innerHTML = `<div class="name">${s.name || s.id}${kindBadge}</div>
-                       <div class="meta">${s.id}</div>`;
+      const kindBadge = s.kind && s.kind !== 'service' ? `<span class="badge kind">${esc(s.kind)}</span>` : '';
+      btn.innerHTML = `<div class="name">${esc(s.name || s.id)}${kindBadge}</div>
+                       <div class="meta">${esc(s.id)}</div>`;
       btn.onclick = () => selectService(s.id, btn);
       body.appendChild(btn);
     }
@@ -89,7 +89,7 @@ function renderGroupLegend(services) {
     chip.dataset.kind = 'group';
     chip.dataset.id = s.groupName;
     chip.style.cssText = `display:inline-flex;align-items:center;gap:5px;padding:3px 8px;border-radius:10px;border:1px solid ${c}66;background:${c}1a;color:var(--text);cursor:pointer;font:inherit;font-size:11px;`;
-    chip.innerHTML = `<span style="width:8px;height:8px;border-radius:50%;background:${c};"></span>${s.groupName}`;
+    chip.innerHTML = `<span style="width:8px;height:8px;border-radius:50%;background:${c};"></span>${esc(s.groupName)}`;
     chip.onclick = (ev) => selectGroup(s.groupName, chip, ev.ctrlKey || ev.metaKey || ev.shiftKey);
     root.appendChild(chip);
   }
@@ -206,7 +206,7 @@ function clusterOnePool(pool, count) {
       image: LB_ICON_SVG,
       size: 28,
       font: { color: nodeFontColor(), size: 13 },
-      title: 'LB pool: ' + pool + ' (' + count + ' services) — double-click to expand',
+      title: 'LB pool: ' + esc(pool) + ' (' + count + ' services) — double-click to expand',
     },
   });
   collapsedPools.add(pool);
@@ -251,7 +251,7 @@ function expandCluster(id) {
     image: LB_ICON_SVG,
     size: 28,
     font: { color: nodeFontColor(), size: 13 },
-    title: 'LB pool: ' + pool + ' — double-click to collapse',
+    title: 'LB pool: ' + esc(pool) + ' — double-click to collapse',
     x: clusterPos.x,
     y: clusterPos.y,
     physics: false,
@@ -335,7 +335,7 @@ function renderLbPools() {
     const chev = collapsed ? '▸' : '▾';
     const bg = collapsed ? '#94a3b822' : 'transparent';
     chip.style.cssText = `display:inline-flex;align-items:center;gap:5px;padding:3px 8px;border-radius:10px;border:1px solid #94a3b866;background:${bg};color:var(--text-soft);cursor:pointer;font:inherit;font-size:11px;`;
-    chip.innerHTML = `<span style="font-family:monospace;">${chev}</span>${pool} <span style="color:var(--text-faint);">(${count})</span>`;
+    chip.innerHTML = `<span style="font-family:monospace;">${chev}</span>${esc(pool)} <span style="color:var(--text-faint);">(${count})</span>`;
     chip.title = collapsed ? `Click to expand "${pool}"` : `Click to collapse "${pool}"`;
     chip.onclick = () => togglePool(pool, count);
     root.appendChild(chip);
