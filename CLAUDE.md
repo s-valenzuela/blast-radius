@@ -14,7 +14,7 @@ npm test                        # run all
 npm run test:watch              # watch mode
 npx vitest run impact           # a single test file by name
 
-# Type-check the model modules (tsc --noEmit, // @ts-check)
+# Type-check the model + ui modules (tsc --noEmit, checkJs)
 npm run typecheck
 ```
 
@@ -26,12 +26,26 @@ This is a **frontend-only** static web app — no server, no database, no build
 step. Everything runs in the browser; logic is plain JS loaded via `<script>`.
 
 **Layout** (everything lives at the repo root):
-- `index.html` — markup; loads vendored libs, the `model/` modules, then `app.js`.
-- `app.js` — all UI: vis-network rendering, the matrix view, LB-pool clustering,
-  selection/highlighting, and the YAML editor. Holds the in-memory graph in a
-  single `model` variable and derives every view from it via `BR.*`.
+- `index.html` — markup; loads vendored libs, the `model/` modules, then the
+  `ui/` scripts in order.
+- `ui/` — all UI, split into plain `<script>` files that share one global scope
+  (no modules/build); loaded in dependency order, `wiring.js` last. They hold the
+  in-memory graph in a single `model` variable and derive every view via `BR.*`:
+  - `config.js`    — static config: palettes, theme colors, storage keys, node
+    sizes, vis-network physics.
+  - `style.js`     — DOM lookup helpers (`el`/`qs`/`qsa`), LB icons, active theme
+    colors, and color/group helpers.
+  - `core.js`      — shared state, `load()`, localStorage persistence, bootstrap,
+    YAML import/export.
+  - `matrix.js`    — the dependency-matrix view and the graph/matrix toggle.
+  - `graph.js`     — node styling, sidebar lists, vis-network rendering, LB-pool
+    clustering.
+  - `selection.js` — service/group selection + highlighting, reset, theme switch.
+  - `wiring.js`    — DOM event wiring, YAML editor, About dialog, bootstrap call.
 - `model/` — the ported domain logic, each a small UMD module exposing a
   `window.BR.<name>` namespace (and `module.exports` for Node tests):
+  - `pools.js`  — shared LB-pool index (service id <-> pool maps), used by
+    `impact.js` and `shape.js`.
   - `parse.js`  — normalize raw YAML into the graph model (dependency shorthand,
     field defaults). Mirrors the old `Dependency`/`ServiceNode` model.
   - `impact.js` — forward/reverse BFS: what a service depends on and what depends
@@ -42,16 +56,16 @@ step. Everything runs in the browser; logic is plain JS loaded via `<script>`.
     pool member — or on the pool name as a `target` — means depending on the
     pool, and all members of a pool share the same blast radius.
   - `shape.js`  — builds the graph (nodes/edges), service list, single-service
-    detail, and matrix payloads consumed by `app.js`.
+    detail, and matrix payloads consumed by the `ui/` scripts.
   - `yaml.js`   — export the model back to YAML (a `dump` that takes the YAML lib
     injected, so it works with the browser global and with Node).
 - `vendor/` — `vis-network.min.js`, `js-yaml.min.js` (no CDN).
 - `services.yml` — the default graph, fetched at startup and reused as the test fixture.
 
-**Data flow:** `app.js` `bootstrap()` fetches `services.yml`, parses it with
-`jsyaml` + `BR.parse.normalize` into `model`, then `load()` renders all views via
-`BR.shape.*`. Upload / Edit-YAML replace `model` and re-render. Nothing leaves the
-browser.
+**Data flow:** `ui/core.js` `bootstrap()` fetches `services.yml` (or restores it
+from localStorage), parses it with `jsyaml` + `BR.parse.normalize` into `model`,
+then `load()` renders all views via `BR.shape.*`. Upload / Edit-YAML replace
+`model` and re-render. Nothing leaves the browser.
 
 **YAML model:**
 - A service has `id`, `name`, `group`, `kind` (`service` default, may be `gateway`
@@ -67,12 +81,14 @@ browser.
 **Node IDs** in the graph payload: services are `svc:<id>`; a pool referenced as
 a dependency target becomes a synthetic `pool:<name>` node (kind `pool`). Note
 the *frontend* member-clustering (collapsing a pool's members into one glyph) is
-a separate visual feature that uses an `lb:<name>` cluster id, built in `app.js`
-— don't confuse it with the `pool:<name>` target node from `shape.graph`.
+a separate visual feature that uses an `lb:<name>` cluster id, built in
+`ui/graph.js` — don't confuse it with the `pool:<name>` target node from
+`shape.graph`.
 
 **Tests** are vitest specs in `model/*.test.js` that load `services.yml` and assert
-on the model functions. `app.js` is type-checked in-editor via `// @ts-check` but
-is not in the `npm run typecheck` gate (which covers the clean `model/` modules).
+on the model functions. Both `model/` and `ui/` (plus `globals.d.ts`) are in the
+`npm run typecheck` gate; the `ui/` scripts share one global scope, so tsc also
+catches duplicate declarations and dangling references across them.
 
 **History:** this was originally a Spring Boot app (and before that, a certificate-
 expiry visualizer). The Java backend was removed once all logic was ported to
