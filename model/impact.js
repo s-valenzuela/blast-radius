@@ -4,10 +4,10 @@
 // what depends on it (impacted if it goes down). Routed deps contribute edges to
 // BOTH the target and the via gateway, matching the Java forward/reverse maps.
 (function (/** @type {any} */ root, factory) {
-  const api = factory();
+  const api = factory(typeof require === 'function' ? require('./pools.js') : (root.BR && root.BR.pools));
   if (typeof module === 'object' && module.exports) module.exports = api;
   else { root.BR = root.BR || {}; root.BR.impact = api; }
-})(typeof self !== 'undefined' ? self : globalThis, function () {
+})(typeof self !== 'undefined' ? self : globalThis, function (pools) {
   'use strict';
 
   // Shape mirrors model/parse.js (typedefs aren't shared across the CJS/UMD
@@ -31,25 +31,8 @@
   // interchangeable, so depending on one member (or on the pool name) means
   // depending on the pool, and the pool is the unit whose blast radius we trace.
   // The closure runs in "unit space" (pool name, or service id when unpooled)
-  // and is expanded back to concrete service ids in the output.
-
-  /**
-   * @param {ServiceGraph} g
-   * @returns {{ memberOf: Map<string,string>, members: Map<string,string[]> }}
-   */
-  function poolIndex(g) {
-    const memberOf = new Map();
-    const members = new Map();
-    for (const s of g.services) {
-      if (s.id == null) continue;
-      const p = s.loadBalancerPool;
-      if (p == null || p === '') continue;
-      memberOf.set(s.id, p);
-      if (!members.has(p)) members.set(p, []);
-      members.get(p).push(s.id);
-    }
-    return { memberOf, members };
-  }
+  // and is expanded back to concrete service ids in the output. The pool index
+  // (id <-> pool maps) is shared with shape.js via model/pools.js.
 
   /** The logical unit a service id belongs to: its pool, or itself. */
   function unitOf(id, idx) { return idx.memberOf.get(id) || id; }
@@ -75,7 +58,7 @@
    * @returns {Map<string, string[]>}
    */
   function forwardMap(g, idx) {
-    idx = idx || poolIndex(g);
+    idx = idx || pools.poolIndex(g);
     /** @type {Map<string, Set<string>>} */
     const forward = new Map();
     for (const s of g.services) {
@@ -100,7 +83,7 @@
    * @returns {Map<string, string[]>}
    */
   function reverseMap(g, idx) {
-    idx = idx || poolIndex(g);
+    idx = idx || pools.poolIndex(g);
     /** @type {Map<string, Set<string>>} */
     const reverse = new Map();
     const add = (key, from) => {
@@ -135,7 +118,7 @@
       return { serviceId, direct: [], via: [], transitive: [], impactedDirect: [], impactedTransitive: [] };
     }
 
-    const idx = poolIndex(model);
+    const idx = pools.poolIndex(model);
     const selfUnit = unitOf(serviceId, idx);
     const selfMembers = new Set(expandUnit(selfUnit, idx));
 

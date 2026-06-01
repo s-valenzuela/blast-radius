@@ -3,10 +3,14 @@
 // the graph (nodes/edges), service list, single-service detail, and matrix.
 // Pure functions over a normalized model — no HTTP.
 (function (/** @type {any} */ root, factory) {
-  const api = factory(typeof require === 'function' ? require('./impact.js') : (root.BR && root.BR.impact));
+  const req = typeof require === 'function';
+  const api = factory(
+    req ? require('./impact.js') : (root.BR && root.BR.impact),
+    req ? require('./pools.js') : (root.BR && root.BR.pools),
+  );
   if (typeof module === 'object' && module.exports) module.exports = api;
   else { root.BR = root.BR || {}; root.BR.shape = api; }
-})(typeof self !== 'undefined' ? self : globalThis, function (impact) {
+})(typeof self !== 'undefined' ? self : globalThis, function (impact, pools) {
   'use strict';
 
   /** @typedef {{ target: string|null, via: string|null }} Dependency */
@@ -28,14 +32,7 @@
     // A dependency may target an LB pool by name. Such a pool renders as one
     // synthetic node ("the load balancer") that fans out to its members. Built
     // lazily, so pools that are never targeted directly add no clutter.
-    const poolMembers = new Map();
-    for (const s of model.services) {
-      if (s.id == null) continue;
-      const p = s.loadBalancerPool;
-      if (p == null || p === '') continue;
-      if (!poolMembers.has(p)) poolMembers.set(p, []);
-      poolMembers.get(p).push(s.id);
-    }
+    const poolMembers = pools.poolIndex(model).members;
     const poolNodesAdded = new Set();
     const ensurePoolNode = (name) => {
       if (poolNodesAdded.has(name)) return;
@@ -142,14 +139,7 @@
     }));
     // The matrix is service x service with no pool column, so a dependency that
     // targets an LB pool by name is expanded to one edge per member.
-    const poolMembers = new Map();
-    for (const s of model.services) {
-      if (s.id == null) continue;
-      const p = s.loadBalancerPool;
-      if (p == null || p === '') continue;
-      if (!poolMembers.has(p)) poolMembers.set(p, []);
-      poolMembers.get(p).push(s.id);
-    }
+    const poolMembers = pools.poolIndex(model).members;
     const deps = [];
     for (const s of sorted) {
       for (const d of s.dependsOn) {
