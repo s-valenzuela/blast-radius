@@ -63,13 +63,13 @@ function selectGroup(groupName, chipEl, additive) {
     .sort((a, b) => (a.label || '').localeCompare(b.label || ''));
   const chipsHtml = groupList.map(g => {
     const c = groupColor(g) || '#94a3b8';
-    return `<span style="background:${c}22;color:${c};border:1px solid ${c}66;padding:2px 8px;border-radius:10px;font-size:11px;margin-right:4px;">${g}</span>`;
+    return `<span style="background:${c}22;color:${c};border:1px solid ${c}66;padding:2px 8px;border-radius:10px;font-size:11px;margin-right:4px;">${esc(g)}</span>`;
   }).join('');
   document.getElementById('impact').innerHTML = `
     <div><b>${groupList.length} group${groupList.length === 1 ? '' : 's'} selected</b> &middot; ${members.size} service(s)</div>
     <div style="margin-top:8px;">${chipsHtml}</div>
     <div style="margin-top:8px;color:var(--text-muted);font-weight:600;font-size:11px;">Members</div>
-    <ul>${memberItems.map(n => `<li>${n.label}</li>`).join('')}</ul>
+    <ul>${memberItems.map(n => `<li>${esc(n.label)}</li>`).join('')}</ul>
     <div style="margin-top:6px;font-size:11px;color:var(--text-muted);">Tip: Ctrl/Cmd-click another group chip to add it.</div>
   `;
 }
@@ -121,15 +121,15 @@ function selectService(svcId, btn) {
   colorPoolsForImpact(poolsDirect, poolsTrans);
 
   const list = (ids) => ids.length
-    ? '<ul>' + ids.map(i => `<li>${i}</li>`).join('') + '</ul>'
+    ? '<ul>' + ids.map(i => `<li>${esc(i)}</li>`).join('') + '</ul>'
     : '<em style="color:var(--text-faint)">none</em>';
   const routeList = (rs) => rs.length
-    ? '<ul>' + rs.map(v => `<li>${v.target} <span style="color:var(--text-muted)">via</span> <b style="color:var(--accent-routed)">${v.via}</b></li>`).join('') + '</ul>'
+    ? '<ul>' + rs.map(v => `<li>${esc(v.target)} <span style="color:var(--text-muted)">via</span> <b style="color:var(--accent-routed)">${esc(v.via)}</b></li>`).join('') + '</ul>'
     : '<em style="color:var(--text-faint)">none</em>';
-  const kindBadge = r.kind && r.kind !== 'service' ? `<span class="badge kind">${r.kind}</span>` : '';
+  const kindBadge = r.kind && r.kind !== 'service' ? `<span class="badge kind">${esc(r.kind)}</span>` : '';
 
   document.getElementById('impact').innerHTML = `
-    <div><b>${r.name || svcId}</b> ${kindBadge}<div style="font-size:11px;color:var(--text-muted);">${svcId}</div></div>
+    <div><b>${esc(r.name || svcId)}</b> ${kindBadge}<div style="font-size:11px;color:var(--text-muted);">${esc(svcId)}</div></div>
     <div style="margin-top:8px;color:var(--accent-direct);font-weight:600;">Direct dependencies</div>
     ${list(r.direct)}
     <div style="margin-top:6px;color:var(--accent-routed);font-weight:600;">Routed (via gateway)</div>

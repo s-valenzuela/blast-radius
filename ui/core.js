@@ -81,7 +81,7 @@ async function bootstrap() {
   } catch (e) {
     model = { services: [] };
     document.getElementById('impact').innerHTML =
-      'Could not load services.yml (' + e.message + '). Use the YAML menu to load or edit.';
+      'Could not load services.yml (' + esc(e.message) + '). Use the YAML menu to load or edit.';
   }
   load();
 }

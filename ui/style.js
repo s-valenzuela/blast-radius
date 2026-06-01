@@ -15,6 +15,15 @@ function qs(sel, root) { return (root || document).querySelector(sel); }
 /** @param {string} sel @param {ParentNode} [root] @returns {NodeListOf<any>} */
 function qsa(sel, root) { return (root || document).querySelectorAll(sel); }
 
+// Escape YAML-derived strings before they reach an innerHTML template or a
+// vis-network tooltip (which renders string titles as HTML). Prevents DOM XSS
+// from a crafted service name/id/group/pool.
+/** @param {*} s @returns {string} */
+function esc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, (c) =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] || c));
+}
+
 function lbIconWithStroke(stroke) {
   return 'data:image/svg+xml;utf8,' + encodeURIComponent(
     '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">' +
