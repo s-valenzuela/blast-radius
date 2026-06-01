@@ -1,30 +1,6 @@
 // @ts-check
-// Bump this when the About dialog content changes enough that returning visitors
-// should see it again (it re-shows once per new version).
-const APP_VERSION = '1';
-
-const COLOR_THEMES = {
-  dark: {
-    service:    { background: '#1e293b', border: '#38bdf8' },
-    gateway:    { background: '#312e81', border: '#a78bfa' },
-    database:   { background: '#0c4a4a', border: '#94a3b8' },
-    pool:       { background: '#0b1220', border: '#94a3b8' },
-    direct:     { background: '#ef4444', border: '#7f1d1d' },
-    trans:      { background: '#fb923c', border: '#7c2d12' },
-    gatewayHit: { background: '#7c3aed', border: '#a78bfa' },
-    dim:        { background: '#1f2937', border: '#334155' },
-  },
-  light: {
-    service:    { background: '#e0f2fe', border: '#0284c7' },
-    gateway:    { background: '#ede9fe', border: '#8b5cf6' },
-    database:   { background: '#ccfbf1', border: '#64748b' },
-    pool:       { background: '#e2e8f0', border: '#64748b' },
-    direct:     { background: '#ef4444', border: '#7f1d1d' },
-    trans:      { background: '#fb923c', border: '#7c2d12' },
-    gatewayHit: { background: '#7c3aed', border: '#a78bfa' },
-    dim:        { background: '#e2e8f0', border: '#94a3b8' },
-  },
-};
+// All UI logic. Static config (palettes, theme colors, storage keys, node
+// sizes, physics) lives in config.js, loaded before this file.
 let COLORS = COLOR_THEMES.dark;
 
 // Loosely-typed DOM lookups. Vanilla JS reads element-specific props (.value,
@@ -74,7 +50,6 @@ function nodeFontColor() {
   return document.documentElement.dataset.theme === 'light' ? '#0f172a' : '#e2e8f0';
 }
 
-const ROUTE_PALETTE = ['#22d3ee', '#a78bfa', '#f472b6', '#34d399', '#fbbf24', '#fb7185', '#60a5fa'];
 // Routed edges are colored by their gateway, so both legs of a call (caller→gw,
 // gw→target) and every route sharing a gateway get one consistent color.
 function gatewayColor(gatewayId) {
@@ -83,7 +58,6 @@ function gatewayColor(gatewayId) {
   return ROUTE_PALETTE[h % ROUTE_PALETTE.length];
 }
 
-const GROUP_PALETTE = ['#38bdf8', '#f472b6', '#34d399', '#fbbf24', '#a78bfa', '#fb7185', '#22d3ee', '#facc15', '#c084fc', '#4ade80'];
 const groupColorCache = {};
 function registerGroups(names) {
   const unique = [...new Set(names.filter(n => n))].sort();
@@ -153,21 +127,11 @@ function load() {
   renderMatrix(matrix);
 }
 
-// The working graph is persisted to localStorage so a page reload restores the
-// user's state instead of resetting to the bundled default. The key holds the
-// serialized YAML; absence means "no user state — use the default".
-const MODEL_KEY = 'blast-radius-model';
-
 function persistModel() {
   try {
     localStorage.setItem(MODEL_KEY, BR.yaml.dump(model, jsyaml));
   } catch (e) { /* quota exceeded / private mode — persistence is best-effort */ }
 }
-
-// Node coordinates are persisted separately from the model (a { id: {x, y} } map)
-// so the force-directed layout doesn't re-shuffle every reload. Keyed by node id,
-// so positions survive edits that keep the same services.
-const POS_KEY = 'blast-radius-positions';
 
 function loadSavedPositions() {
   try {
@@ -576,10 +540,7 @@ function nodeShape(n) {
 }
 
 function nodeSize(n) {
-  if (n.kind === 'gateway') return 26;
-  if (n.kind === 'database') return 14;
-  if (n.kind === 'pool') return 22;
-  return 18;
+  return NODE_SIZE[n.kind] || NODE_SIZE.service;
 }
 
 function renderServices(services) {
@@ -703,19 +664,7 @@ function renderGraph(graph) {
   nodesDS = new vis.DataSet(allNodes);
   edgesDS = new vis.DataSet(allEdges.concat(groupCohesionEdges()));
   network = new vis.Network(document.getElementById('network'), { nodes: nodesDS, edges: edgesDS }, {
-    physics: haveAllPos ? false : {
-      solver: 'forceAtlas2Based',
-      forceAtlas2Based: {
-        gravitationalConstant: -150,
-        centralGravity: 0.005,
-        springLength: 220,
-        springConstant: 0.06,
-        damping: 0.6,
-        avoidOverlap: 0.6,
-      },
-      stabilization: { enabled: true, iterations: 600, updateInterval: 25, fit: true },
-      minVelocity: 0.75,
-    },
+    physics: haveAllPos ? false : NETWORK_PHYSICS,
     interaction: { hover: true, tooltipDelay: 150, dragNodes: true },
     nodes: { font: { color: nodeFontColor(), size: 12 } },
     edges: { smooth: { type: 'continuous' }, length: 220 },
@@ -1120,7 +1069,6 @@ document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape' && !about
 // Show the About dialog once per app version: on a visitor's first load, and
 // again the first time they load after APP_VERSION is bumped. The stored value
 // is the last version whose About they saw, so a newer version re-shows it.
-const ABOUT_SEEN_KEY = 'blast-radius-about-seen';
 let aboutSeenVersion = null;
 try { aboutSeenVersion = localStorage.getItem(ABOUT_SEEN_KEY); } catch (e) {}
 if (aboutSeenVersion !== APP_VERSION) {
