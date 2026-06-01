@@ -8,6 +8,9 @@ declare const vis: any;
 /** js-yaml UMD global (vendor/js-yaml.min.js). */
 declare const jsyaml: any;
 
+/** The model namespace (model/*.js attach BR.parse/pools/impact/shape/yaml). */
+declare const BR: any;
+
 /** CommonJS globals, present only when the UMD modules run under node (vitest). */
 declare var module: any;
 declare function require(id: string): any;

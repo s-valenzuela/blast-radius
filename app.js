@@ -27,6 +27,17 @@ const COLOR_THEMES = {
 };
 let COLORS = COLOR_THEMES.dark;
 
+// Loosely-typed DOM lookups. Vanilla JS reads element-specific props (.value,
+// .dataset, .style, .offsetWidth) off lookups that the DOM lib types as the base
+// Element/HTMLElement, so these helpers return `any` to keep call sites clean
+// while the gate still checks the rest of the logic.
+/** @param {string} id @returns {any} */
+function el(id) { return document.getElementById(id); }
+/** @param {string} sel @param {ParentNode} [root] @returns {any} */
+function qs(sel, root) { return (root || document).querySelector(sel); }
+/** @param {string} sel @param {ParentNode} [root] @returns {NodeListOf<any>} */
+function qsa(sel, root) { return (root || document).querySelectorAll(sel); }
+
 function lbIconWithStroke(stroke) {
   return 'data:image/svg+xml;utf8,' + encodeURIComponent(
     '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">' +
@@ -340,7 +351,7 @@ function renderMatrix(data) {
     const s = services[c];
     const lbl = document.createElement('div');
     lbl.className = 'mlabel-col' + (groupBoundaries.has(c) && c > 0 ? ' mblock-vstart' : '');
-    lbl.dataset.col = c;
+    lbl.dataset.col = String(c);
     lbl.dataset.id = s.id;
     lbl.textContent = s.name;
     lbl.title = `${s.name} (${s.id})\nClick to highlight column (services that depend on this)`;
@@ -376,7 +387,7 @@ function renderMatrix(data) {
       rowLbl.className = 'mlabel-row' + (rr === r && rr > 0 ? ' mblock-hstart' : '');
       rowLbl.style.gridRow = `${3 + rr}`;
       rowLbl.style.gridColumn = '2';
-      rowLbl.dataset.row = rr;
+      rowLbl.dataset.row = String(rr);
       rowLbl.dataset.id = s.id;
       rowLbl.textContent = s.name;
       rowLbl.title = `${s.name} (${s.id})\nClick to highlight row (what this depends on)`;
@@ -394,8 +405,8 @@ function renderMatrix(data) {
         cell.style.gridRow = `${3 + rr}`;
         cell.style.gridColumn = `${3 + cc}`;
         cell.style.setProperty('--mc', groupColor(s.group) || '#38bdf8');
-        cell.dataset.row = rr;
-        cell.dataset.col = cc;
+        cell.dataset.row = String(rr);
+        cell.dataset.col = String(cc);
         if (kind === 'direct') cell.title = `${s.name} → ${t.name}  (direct)`;
         else if (kind === 'via') cell.title = `${s.name} → ${t.name}  (via ${matrixVia.get(keypair(s.id, t.id))})`;
         else if (kind === 'trans') cell.title = `${s.name} → ${t.name}  (transitive)`;
@@ -507,7 +518,7 @@ function setView(view) {
   document.getElementById('matrix-wrap').style.display = isMatrix ? '' : 'none';
   document.getElementById('network').style.display = isMatrix ? 'none' : '';
   document.getElementById('legend').style.display = isMatrix ? 'none' : '';
-  document.querySelectorAll('#view-toggle button').forEach(b => b.classList.toggle('active', b.dataset.view === view));
+  qsa('#view-toggle button').forEach(b => b.classList.toggle('active', b.dataset.view === view));
   if (!isMatrix && network) {
     network.redraw();
     setTimeout(() => network.fit({ animation: false }), 50);
@@ -518,7 +529,7 @@ function setView(view) {
 function sizeMatrix() {
   if (!matrixData) return;
   const wrap = document.getElementById('matrix-wrap');
-  const grid = wrap.querySelector('.matrix-grid');
+  const grid = qs('.matrix-grid', wrap);
   if (!wrap || !grid || wrap.offsetWidth === 0) return;
 
   // Measure label/header dims at their natural size first
@@ -528,14 +539,14 @@ function sizeMatrix() {
   const padX = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
   const padY = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
 
-  const title = wrap.querySelector('.matrix-title');
-  const legend = wrap.querySelector('.mlegend');
+  const title = qs('.matrix-title', wrap);
+  const legend = qs('.mlegend', wrap);
   const chromeH = (title ? title.offsetHeight + 14 : 0) + (legend ? legend.offsetHeight + 18 : 0);
 
-  const groupRow = grid.querySelector('.mgroup-row');
-  const labelRow = grid.querySelector('.mlabel-row');
-  const groupCol = grid.querySelector('.mgroup-col');
-  const labelCol = grid.querySelector('.mlabel-col');
+  const groupRow = qs('.mgroup-row', grid);
+  const labelRow = qs('.mlabel-row', grid);
+  const groupCol = qs('.mgroup-col', grid);
+  const labelCol = qs('.mlabel-col', grid);
   const labelW = (groupRow ? groupRow.offsetWidth : 0) + (labelRow ? labelRow.offsetWidth : 0);
   const headerH = (groupCol ? groupCol.offsetHeight : 0) + (labelCol ? labelCol.offsetHeight : 0);
 
@@ -903,7 +914,7 @@ function renderLbPools() {
 
 function setActive(btn) {
   document.querySelectorAll('.item.active').forEach(el => el.classList.remove('active'));
-  document.querySelectorAll('[data-kind="group"]').forEach(el => { el.style.outline = ''; el.style.outlineOffset = ''; });
+  qsa('[data-kind="group"]').forEach(g => { g.style.outline = ''; g.style.outlineOffset = ''; });
   selectedGroupNames.clear();
   if (btn) {
     btn.classList.add('active');
@@ -927,14 +938,14 @@ function selectGroup(groupName, chipEl, additive) {
     selectedGroupNames.add(groupName);
   }
 
-  document.querySelectorAll('[data-kind="group"]').forEach(el => {
-    if (selectedGroupNames.has(el.dataset.id)) {
-      const c = groupColor(el.dataset.id);
-      el.style.outline = `2px solid ${c}`;
-      el.style.outlineOffset = '1px';
+  qsa('[data-kind="group"]').forEach(g => {
+    if (selectedGroupNames.has(g.dataset.id)) {
+      const c = groupColor(g.dataset.id);
+      g.style.outline = `2px solid ${c}`;
+      g.style.outlineOffset = '1px';
     } else {
-      el.style.outline = '';
-      el.style.outlineOffset = '';
+      g.style.outline = '';
+      g.style.outlineOffset = '';
     }
   });
 
@@ -1143,10 +1154,11 @@ yamlMenuList.onclick = () => { yamlMenuList.hidden = true; };
 document.addEventListener('click', (ev) => {
   if (!yamlMenu.contains(/** @type {Node} */ (ev.target))) yamlMenuList.hidden = true;
 });
-document.getElementById('file-input').onchange = (ev) => {
-  const file = ev.target.files && ev.target.files[0];
+el('file-input').onchange = (ev) => {
+  const t = /** @type {HTMLInputElement} */ (ev.target);
+  const file = t.files && t.files[0];
   if (file) uploadYaml(file);
-  ev.target.value = '';
+  t.value = '';
 };
 
 function validateServiceGraph(text) {
@@ -1186,9 +1198,9 @@ function validateServiceGraph(text) {
 
 let lintTimer = null;
 function lintYaml() {
-  const ta = document.getElementById('yaml-text');
+  const ta = el('yaml-text');
   const status = document.getElementById('yaml-lint');
-  const save = document.getElementById('yaml-save');
+  const save = el('yaml-save');
   const result = validateServiceGraph(ta.value);
   if (result.ok) {
     status.className = 'lint-status ok';
@@ -1217,7 +1229,7 @@ document.getElementById('edit-yaml').onclick = async () => {
   yamlBtn.textContent = '▶';
   yamlBtn.title = 'Hide YAML panel';
 
-  const ta = document.getElementById('yaml-text');
+  const ta = el('yaml-text');
   if (!wasOpen) {
     const status = document.getElementById('yaml-lint');
     try {
@@ -1246,9 +1258,9 @@ document.getElementById('yaml-toggle').onclick = () => {
   setTimeout(() => { if (network) network.redraw(); }, 250);
 };
 document.getElementById('yaml-save').onclick = () => {
-  const text = document.getElementById('yaml-text').value;
+  const text = el('yaml-text').value;
   const status = document.getElementById('yaml-lint');
-  const save = document.getElementById('yaml-save');
+  const save = el('yaml-save');
   save.disabled = true;
   try {
     model = BR.parse.normalize(jsyaml.load(text));
@@ -1261,7 +1273,7 @@ document.getElementById('yaml-save').onclick = () => {
     save.disabled = false;
   }
 };
-document.querySelectorAll('#view-toggle button').forEach(b => b.onclick = () => setView(b.dataset.view));
+qsa('#view-toggle button').forEach(b => b.onclick = () => setView(b.dataset.view));
 window.addEventListener('resize', () => { if (document.getElementById('matrix-wrap').offsetWidth > 0) sizeMatrix(); });
 
 (function initTheme() {
